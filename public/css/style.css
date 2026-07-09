@@ -534,6 +534,66 @@ hr.sep { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 .tone.slim b { font-size: 13px; margin-bottom: 3px; }
 .tone.slim p { font-size: 12px; }
 
+/* ============================================================
+   МОБІЛЬНА АДАПТАЦІЯ
+   ============================================================ */
+@media (max-width: 760px) {
+  /* Навігація: бренд зверху, пункти-пігулки під ним */
+  nav { padding: 12px 14px 10px; gap: 6px; }
+  nav .brand { width: 100%; margin: 0 0 6px; font-size: 15px; }
+  nav .brand .brand-logo { width: 24px; height: 24px; }
+  nav a.link { padding: 7px 12px; font-size: 11px; letter-spacing: .7px; }
+
+  .container { padding: 26px 16px 70px; }
+  h1 { font-size: 25px; letter-spacing: -.6px; }
+  .subtitle { font-size: 14px; margin-bottom: 22px; }
+
+  .card { padding: 18px 16px; border-radius: 12px; margin-bottom: 16px; }
+  .card h2 { font-size: 12px; margin-bottom: 14px; }
+  .grid2 { gap: 12px; }
+
+  /* 16px — щоб iOS не зумив сторінку при фокусі на полі */
+  input[type=text], input[type=url], input[type=email], input[type=number], textarea, select { font-size: 16px; }
+
+  /* Кнопки на всю ширину — зручно тиснути пальцем */
+  .btn { width: 100%; justify-content: center; padding: 14px 20px; }
+  .btn.small { width: auto; }
+
+  .drop { padding: 24px 14px; font-size: 13.5px; }
+  .thumb { width: 84px; height: 84px; }
+
+  /* Перемикачі стилю/обсягу — в стовпчик */
+  .tones { gap: 10px; }
+  .tone, .tone.slim { flex: 1 1 100%; min-width: 100%; padding: 13px 14px; }
+  .tone .t-emoji { font-size: 24px; margin-bottom: 5px; }
+
+  /* Головна */
+  .hero { padding: 30px 2px 20px; }
+  .hero h1 { font-size: clamp(30px, 9vw, 40px); letter-spacing: -1.2px; margin-bottom: 16px; }
+  .hero p { font-size: 15px; margin-bottom: 20px; }
+  .marquee { margin: 28px -16px 0; padding: 12px 0; }
+  .marquee-track { gap: 26px; }
+  .marquee-track span { font-size: 26px; -webkit-text-stroke-width: 1px; }
+  .marquee-track span.dot { font-size: 14px; }
+  .stats { flex-wrap: wrap; }
+  .stats div { padding: 10px 14px 10px 0; margin-right: 14px; }
+  .stats div + div::before { left: -14px; }
+  .stats b { font-size: 16px; }
+  .stats span { font-size: 10.5px; letter-spacing: 1px; }
+
+  footer { flex-direction: column; align-items: flex-start; gap: 6px; padding: 20px 16px; margin-top: 44px; }
+
+  /* Lightbox */
+  #lightbox { padding: 12px; }
+  #lightbox #lb-close { top: 10px; right: 16px; }
+}
+
+/* Дуже вузькі екрани */
+@media (max-width: 380px) {
+  .thumb { width: 76px; height: 76px; }
+  nav a.link { padding: 6px 10px; font-size: 10.5px; }
+}
+
 /* ---------- Доступність ---------- */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01s !important; animation-iteration-count: 1 !important; transition-duration: .01s !important; }
