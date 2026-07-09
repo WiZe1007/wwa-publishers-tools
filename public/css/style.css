@@ -497,11 +497,14 @@ hr.sep { height: 1px; margin: 23px 0; border: 0; background: linear-gradient(90d
   font-size: clamp(44px, 7.1vw, 90px);
   font-weight: 800;
   letter-spacing: -4.6px;
-  line-height: .98;
+  line-height: 1.05;
+  padding-block: .04em;
 }
 
 .hero h1 .grad {
   display: inline-block;
+  padding: .02em .04em .08em;
+  margin: -.02em -.04em -.08em;
   background: linear-gradient(100deg, #68dfff, #72c9ff 40%, #9c82ff 79%);
   -webkit-background-clip: text;
   background-clip: text;
