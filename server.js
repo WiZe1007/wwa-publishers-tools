@@ -28,9 +28,9 @@ app.get('/api/health', (req, res) => {
 });
 
 // ===== Спам-аналіз тексту (точна логіка ASOMobile Text Analyzer) =====
-// Форми слова об'єднуються (tile + tiles + tile-matching = "tile"),
+// Форми слова об'єднуються (tap + taps + tapping + tapped = "tap"),
 // переспам = щільність слова > SPAM_DENSITY % від загальної кількості слів
-const SPAM_DENSITY = Number(process.env.SPAM_DENSITY || 3);
+const SPAM_DENSITY = Number(process.env.SPAM_DENSITY || 2.5);
 const STOP_WORDS = new Set(('a,an,the,and,or,but,if,then,else,when,while,for,to,of,in,on,at,by,with,from,up,down,' +
   'out,off,over,under,again,further,once,here,there,all,any,both,each,few,more,most,other,some,such,no,nor,not,' +
   'only,own,same,so,than,too,very,can,will,just,should,now,is,are,was,were,be,been,being,have,has,had,do,does,' +
@@ -38,12 +38,31 @@ const STOP_WORDS = new Set(('a,an,the,and,or,but,if,then,else,when,while,for,to,
   'them,their,he,she,his,her,i,me,my,as,about,into,through,after,before,between,during,without,within,also,' +
   'get,let,us,via,per,vs,etc,s,t,re,ll,d,m').split(','));
 
-// Нормалізація слова: множина зводиться до однини (tiles→tile, boxes→box, berries→berry)
-function normalize(w) {
+// Нормалізація слова: об'єднання форм (множина, -ing, -ed), як в ASOMobile
+// tiles→tile, boxes→box, berries→berry, tapping→tap, tapped→tap, matched→match
+function stripPlural(w) {
   if (w.length > 3 && w.endsWith('ies')) return w.slice(0, -3) + 'y';
   if (w.length > 3 && w.endsWith('es') && /(s|x|z|ch|sh)es$/.test(w)) return w.slice(0, -2);
   if (w.length > 2 && w.endsWith('s') && !w.endsWith('ss') && !w.endsWith('us')) return w.slice(0, -1);
   return w;
+}
+function undouble(s) {
+  // tapp→tap, runn→run (подвоєна приголосна після зняття суфікса)
+  if (s.length > 2 && s.at(-1) === s.at(-2) && !'aeiou'.includes(s.at(-1))) return s.slice(0, -1);
+  return s;
+}
+function normalize(w) {
+  if (w.length > 5 && w.endsWith('ying')) return w.slice(0, -4) + 'y';       // studying→study
+  if (w.length > 4 && w.endsWith('ing')) {
+    const s = undouble(w.slice(0, -3));                                       // tapping→tap
+    if (s.length >= 3) return stripPlural(s);
+  }
+  if (w.length > 4 && w.endsWith('ied')) return w.slice(0, -3) + 'y';         // carried→carry
+  if (w.length > 4 && w.endsWith('ed') && !w.endsWith('eed')) {
+    const s = undouble(w.slice(0, -2));                                       // tapped→tap, matched→match... (matche→match нижче)
+    if (s.length >= 3) return stripPlural(s);
+  }
+  return stripPlural(w);
 }
 
 // Токенізація: дефіси розбивають слово (tile-matching → tile + matching), як в ASOMobile
@@ -59,16 +78,23 @@ function analyzeText(text) {
   const tokens = tokenize(text);
   const totalWords = tokens.length; // всі слова, включно зі стоп-словами (як в ASOMobile)
   const freq = {};
+  const forms = {};
   for (const t of tokens) {
     if (t.length < 2 || STOP_WORDS.has(t) || /^\d+$/.test(t)) continue;
     const n = normalize(t);
     freq[n] = (freq[n] || 0) + 1;
+    forms[n] = forms[n] || {};
+    forms[n][t] = (forms[n][t] || 0) + 1;
   }
   const frequency = Object.entries(freq)
-    .map(([word, count]) => ({
-      word, count,
-      density: totalWords ? +(count / totalWords * 100).toFixed(2) : 0
-    }))
+    .map(([stem, count]) => {
+      // показуємо найчастішу реальну форму слова, а не обрубок-стем
+      const display = Object.entries(forms[stem]).sort((a, b) => b[1] - a[1])[0][0];
+      return {
+        word: display, count,
+        density: totalWords ? +(count / totalWords * 100).toFixed(2) : 0
+      };
+    })
     .sort((a, b) => b.count - a.count);
   const spam = frequency.filter(w => w.density > SPAM_DENSITY);
   return { totalWords, frequency, spam, maxAllowed: Math.floor(totalWords * SPAM_DENSITY / 100) };
@@ -185,7 +211,8 @@ ${TONE_INSTRUCTIONS[tone] || TONE_INSTRUCTIONS.normal}
 - Без слів ПОВНІСТЮ КАПСОМ (окрім абревіатур), без повторюваної пунктуації (!!!, ???).
 - Емодзі дозволені ТІЛЬКИ у full_description. У short_description — ЗАБОРОНЕНІ (політика Google Play), там лише текст і розділові знаки.
 - Без неперевірених заяв типу "#1 app", "the best app", без згадок конкурентів, рейтингів чи цін.
-- Опис має пройти модерацію Google Play без ризику блокування.`;
+- Опис має пройти модерацію Google Play без ризику блокування.
+- АНТИ-ПЕРЕСПАМ: не повторюй жодне значуще слово (включно з усіма його формами: множина, -ing, -ed, у складених словах через дефіс) частіше ніж ~2 рази на кожні 100 слів тексту. Наприклад, у тексті на 220 слів — максимум 5 повторів одного слова. Активно використовуй синоніми.`;
 
     if (needSelection) {
       task += `
@@ -230,14 +257,15 @@ ${TONE_INSTRUCTIONS[tone] || TONE_INSTRUCTIONS.normal}
       fixAttempts++;
       console.log(`Spam fix attempt ${fixAttempts}:`, analysis.spam.map(s => `${s.word}(${s.count}, ${s.density}%)`).join(', '));
       try {
+        const safeMax = Math.max(1, analysis.maxAllowed - 1); // запас міцності на різницю в підрахунку
         const fixPrompt = `Below is a full description for Google Play for the app "${appName}".
-A keyword-spam check (ASOMobile Text Analyzer) found over-used words. Rule: a word's density must not exceed ${SPAM_DENSITY}% of the total word count. The text has ${analysis.totalWords} words, so each word (all its forms combined: singular + plural + as part of hyphenated words, e.g. tile + tiles + tile-matching all count as "tile") may appear at most ${analysis.maxAllowed} times.
+A keyword-spam check (ASOMobile Text Analyzer) found over-used words. Rule: a word's density must not exceed ${SPAM_DENSITY}% of the total word count. The text has ${analysis.totalWords} words. All forms of a word count together: singular + plural + -ing/-ed forms + inside hyphenated words (tap + taps + tapping + tapped + tap-to-win all count as "tap").
 
 Over-used words:
-${analysis.spam.map(s => `- "${s.word}" — used ${s.count} times (${s.density}%), allowed max ${analysis.maxAllowed}`).join('\n')}
+${analysis.spam.map(s => `- "${s.word}" — used ${s.count} times (${s.density}%), allowed max ${safeMax}`).join('\n')}
 
 Rewrite the description so that:
-1. Each of these words (counting ALL its forms: plural, singular, inside hyphenated words) appears no more than ${analysis.maxAllowed} times — replace extra occurrences with synonyms or rephrase. Do not simply delete sentences; keep overall length similar.
+1. Each of these words (counting ALL its forms) appears no more than ${safeMax} times — replace extra occurrences with synonyms or rephrase. Do not simply delete sentences; keep overall length similar.
 2. The meaning, features and overall length stay the same.
 3. Do NOT add features that are not mentioned.
 4. Keep it natural, high-quality English for Google Play.
