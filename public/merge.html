@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Merge Images — WWA Publishers Tools</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧩</text></svg>">
+<link rel="stylesheet" href="css/style.css">
+<script src="js/lightbox.js"></script>
+<script src="js/ui.js"></script>
+</head>
+<body>
+<nav>
+  <a class="brand" href="index.html">WWA <span>Publishers Tools</span></a>
+  <a class="link" href="zip.html">ZIP Creating</a>
+  <a class="link" href="resize.html">Resize the Image</a>
+  <a class="link" href="convert.html">Convert Images</a>
+  <a class="link active" href="merge.html">Merge Images</a>
+</nav>
+
+<div class="container">
+  <h1>🧩 Merge Images</h1>
+  <p class="subtitle">Об'єднання кількох зображень в одне — горизонтально, вертикально або сіткою</p>
+
+  <div class="card">
+    <div class="drop" id="drop">
+      <span class="big">🖼️</span>
+      Перетягніть зображення сюди або натисніть, щоб обрати (2 і більше)<br>
+      <span class="hint">Порядок можна змінювати стрілками на мініатюрах</span>
+    </div>
+    <input type="file" id="input" accept="image/*" multiple hidden>
+    <div class="thumbs" id="thumbs"></div>
+  </div>
+
+  <div class="card" id="controls" style="display:none">
+    <h2>Налаштування</h2>
+    <div class="row">
+      <label class="fld" style="margin:0"><b>Напрямок</b>
+        <select id="direction" style="width:170px">
+          <option value="horizontal">Горизонтально →</option>
+          <option value="vertical">Вертикально ↓</option>
+          <option value="grid">Сітка</option>
+        </select>
+      </label>
+      <label class="fld" style="margin:0" id="colsWrap" style="display:none"><b>Колонок у сітці</b>
+        <input type="number" id="cols" min="1" value="2" style="width:100px">
+      </label>
+      <label class="fld" style="margin:0"><b>Вирівнювання розмірів</b>
+        <select id="fitMode" style="width:220px">
+          <option value="none">Без змін (оригінальні розміри)</option>
+          <option value="unify" selected>Підігнати під один розмір</option>
+        </select>
+      </label>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <label class="fld" style="margin:0"><b>Відступ між (px)</b>
+        <input type="number" id="gap" min="0" value="0" style="width:100px">
+      </label>
+      <label class="fld" style="margin:0"><b>Колір фону</b>
+        <input type="color" id="bgColor" value="#ffffff" style="width:60px;height:40px;padding:3px;background:var(--bg);border:1px solid var(--border);border-radius:9px;cursor:pointer">
+      </label>
+      <label class="check" style="padding-top:18px">
+        <input type="checkbox" id="transparent" checked> Прозорий фон (PNG)
+      </label>
+      <label class="fld" style="margin:0"><b>Формат</b>
+        <select id="format" style="width:130px">
+          <option value="image/png">PNG</option>
+          <option value="image/jpeg">JPEG</option>
+          <option value="image/webp">WebP</option>
+        </select>
+      </label>
+    </div>
+    <hr class="sep">
+    <div class="row">
+      <button class="btn" id="mergeBtn">🧩 Об'єднати та скачати</button>
+      <button class="btn secondary" id="previewBtn">👁 Попередній перегляд</button>
+      <span class="status" id="status" style="margin:0"></span>
+    </div>
+    <div class="preview-box" id="previewBox" style="display:none">
+      <canvas id="canvas"></canvas>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let items = []; // {file, url, img}
+
+const drop = $('drop'), input = $('input');
+drop.onclick = () => input.click();
+input.onchange = () => { addFiles([...input.files]); input.value = ''; };
+;['dragover','dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => {
+  e.preventDefault();
+  drop.classList.toggle('dragover', ev === 'dragover');
+  if (ev === 'drop') addFiles([...e.dataTransfer.files].filter(f => f.type.startsWith('image/')));
+}));
+
+async function addFiles(list) {
+  for (const f of list) {
+    const url = URL.createObjectURL(f);
+    const img = await new Promise((res, rej) => {
+      const i = new Image();
+      i.onload = () => res(i);
+      i.onerror = () => rej();
+      i.src = url;
+    }).catch(() => null);
+    if (img) items.push({ file: f, url, img });
+  }
+  render();
+}
+
+function render() {
+  const box = $('thumbs');
+  box.innerHTML = '';
+  items.forEach((it, i) => {
+    const d = document.createElement('div');
+    d.className = 'thumb';
+    d.innerHTML = `<img src="${it.url}"><span class="num">${i + 1}</span><span class="x">✕</span>
+      <div style="position:absolute;bottom:2px;left:2px;right:2px;display:flex;justify-content:space-between">
+        <button class="mv" data-d="-1" style="background:rgba(0,0,0,.65);color:#fff;border:none;border-radius:5px;cursor:pointer;padding:0 6px">←</button>
+        <button class="mv" data-d="1" style="background:rgba(0,0,0,.65);color:#fff;border:none;border-radius:5px;cursor:pointer;padding:0 6px">→</button>
+      </div>`;
+    d.querySelector('img').onclick = () => openLightbox(it.url);
+    d.querySelector('.x').onclick = () => { URL.revokeObjectURL(it.url); items.splice(i, 1); render(); };
+    d.querySelectorAll('.mv').forEach(b => b.onclick = () => {
+      const j = i + Number(b.dataset.d);
+      if (j < 0 || j >= items.length) return;
+      [items[i], items[j]] = [items[j], items[i]];
+      render();
+    });
+    box.appendChild(d);
+  });
+  $('controls').style.display = items.length >= 2 ? '' : 'none';
+}
+
+$('direction').onchange = () => {
+  $('colsWrap').style.display = $('direction').value === 'grid' ? '' : 'none';
+};
+$('colsWrap').style.display = 'none';
+
+$('format').onchange = () => {
+  if ($('format').value !== 'image/png') $('transparent').checked = false;
+};
+
+function compose() {
+  const dir = $('direction').value;
+  const gap = Math.max(0, parseInt($('gap').value) || 0);
+  const unify = $('fitMode').value === 'unify';
+  const cols = dir === 'grid' ? Math.max(1, parseInt($('cols').value) || 2) : (dir === 'horizontal' ? items.length : 1);
+  const transparent = $('transparent').checked && $('format').value === 'image/png';
+
+  // Determine cell sizes
+  let sizes = items.map(it => ({ w: it.img.width, h: it.img.height }));
+  if (unify) {
+    if (dir === 'horizontal') {
+      const h = Math.min(...sizes.map(s => s.h));
+      sizes = items.map(it => ({ w: Math.round(it.img.width * h / it.img.height), h }));
+    } else if (dir === 'vertical') {
+      const w = Math.min(...sizes.map(s => s.w));
+      sizes = items.map(it => ({ w, h: Math.round(it.img.height * w / it.img.width) }));
+    } else {
+      // grid: спільна ширина клітинки = мінімальна ширина, висота — пропорційно кожному зображенню
+      const w = Math.min(...sizes.map(s => s.w));
+      sizes = items.map(it => ({ w, h: Math.round(it.img.height * w / it.img.width) }));
+    }
+  }
+
+  const rows = Math.ceil(items.length / cols);
+  let colW = [], rowH = [];
+  for (let i = 0; i < items.length; i++) {
+    const c = i % cols, r = Math.floor(i / cols);
+    colW[c] = Math.max(colW[c] || 0, sizes[i].w);
+    rowH[r] = Math.max(rowH[r] || 0, sizes[i].h);
+  }
+  const W = colW.reduce((a, b) => a + b, 0) + gap * (colW.length - 1);
+  const H = rowH.reduce((a, b) => a + b, 0) + gap * (rowH.length - 1);
+
+  const canvas = $('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  if (!transparent) { ctx.fillStyle = $('bgColor').value; ctx.fillRect(0, 0, W, H); }
+  else ctx.clearRect(0, 0, W, H);
+
+  for (let i = 0; i < items.length; i++) {
+    const c = i % cols, r = Math.floor(i / cols);
+    let x = 0, y = 0;
+    for (let k = 0; k < c; k++) x += colW[k] + gap;
+    for (let k = 0; k < r; k++) y += rowH[k] + gap;
+    // center in cell
+    x += Math.round((colW[c] - sizes[i].w) / 2);
+    y += Math.round((rowH[r] - sizes[i].h) / 2);
+    ctx.drawImage(items[i].img, x, y, sizes[i].w, sizes[i].h);
+  }
+  return canvas;
+}
+
+$('previewBtn').onclick = () => {
+  if (items.length < 2) return;
+  compose();
+  $('previewBox').style.display = '';
+  $('status').className = 'status';
+  $('status').textContent = `Розмір результату: ${$('canvas').width} × ${$('canvas').height} px`;
+};
+
+$('mergeBtn').onclick = () => {
+  const st = $('status');
+  if (items.length < 2) { st.className = 'status err'; st.textContent = 'Додайте мінімум 2 зображення.'; return; }
+  const canvas = compose();
+  $('previewBox').style.display = '';
+  const type = $('format').value;
+  const ext = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' }[type];
+  canvas.toBlob(blob => {
+    if (!blob) { st.className = 'status err'; st.textContent = 'Помилка створення зображення.'; return; }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `merged.${ext}`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    st.className = 'status ok';
+    st.textContent = `✓ Готово: merged.${ext} (${canvas.width} × ${canvas.height} px)`;
+  }, type, 0.95);
+};
+</script>
+</body>
+</html>

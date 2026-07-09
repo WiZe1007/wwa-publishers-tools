@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZIP Creating — WWA Publishers Tools</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
+<link rel="stylesheet" href="css/style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="js/lightbox.js"></script>
+<script src="js/ui.js"></script>
+</head>
+<body>
+<nav>
+  <a class="brand" href="index.html">WWA <span>Publishers Tools</span></a>
+  <a class="link active" href="zip.html">ZIP Creating</a>
+  <a class="link" href="resize.html">Resize the Image</a>
+  <a class="link" href="convert.html">Convert Images</a>
+  <a class="link" href="merge.html">Merge Images</a>
+</nav>
+
+<div class="container">
+  <h1>📦 ZIP Creating</h1>
+  <p class="subtitle">Заповніть дані додатку, додайте файли — AI згенерує ASO описи, обере найкращі скріншоти та збере готовий .zip</p>
+
+  <!-- ======== Дані додатку ======== -->
+  <div class="card">
+    <h2>1. Дані додатку</h2>
+    <div class="grid2">
+      <label class="fld"><b>Назва додатку / гри *</b>
+        <input type="text" id="appName" placeholder="My Awesome Game">
+      </label>
+      <label class="fld"><b>Category</b>
+        <input type="text" id="category" placeholder="Casual, Puzzle, Tools...">
+      </label>
+      <label class="fld"><b>Privacy Policy (посилання)</b>
+        <input type="url" id="policy" placeholder="https://...">
+      </label>
+      <label class="fld"><b>Website (посилання)</b>
+        <input type="url" id="website" placeholder="https://...">
+      </label>
+      <label class="fld"><b>Mail</b>
+        <input type="email" id="mail" placeholder="developer@example.com">
+      </label>
+      <label class="fld"><b>Target audience and content</b>
+        <input type="text" id="audience" placeholder="Everyone / 13+ ...">
+      </label>
+      <label class="fld"><b>Content rating</b>
+        <input type="text" id="rating" value="3+">
+      </label>
+      <label class="fld"><b>Advertising ID</b>
+        <select id="advId">
+          <option value="Yes (Analytics + Advertising Marketing)">Yes (Analytics + Advertising Marketing)</option>
+          <option value="No">No</option>
+        </select>
+      </label>
+    </div>
+    <label class="fld"><b>Опис від розробника *</b>
+      <textarea id="devDescription" placeholder="Опис додатку/гри від розробника (будь-якою мовою) — на його основі AI створить ASO описи"></textarea>
+    </label>
+  </div>
+
+  <!-- ======== Скріншоти ======== -->
+  <div class="card">
+    <h2>2. Скріншоти</h2>
+    <div class="drop" id="shotsDrop">
+      <span class="big">🖼️</span>
+      Перетягніть скріншоти сюди або натисніть, щоб обрати<br>
+      <span class="hint">Якщо скріншотів більше 8 — AI обере 8 найкращих. Файли будуть пронумеровані 1, 2, 3...</span>
+    </div>
+    <input type="file" id="shotsInput" accept="image/*" multiple hidden>
+    <div class="thumbs" id="shotsThumbs"></div>
+  </div>
+
+  <!-- ======== Файли ======== -->
+  <div class="card">
+    <h2>3. Файли додатку</h2>
+    <div class="grid2">
+      <div>
+        <label class="fld"><b>APK</b></label>
+        <div class="drop small-drop" data-target="apk">Обрати .apk</div>
+        <input type="file" id="file_apk" accept=".apk" hidden>
+        <div class="filelist" id="list_apk"></div>
+      </div>
+      <div>
+        <label class="fld"><b>AAB</b></label>
+        <div class="drop small-drop" data-target="aab">Обрати .aab</div>
+        <input type="file" id="file_aab" accept=".aab" hidden>
+        <div class="filelist" id="list_aab"></div>
+      </div>
+      <div>
+        <label class="fld"><b>Banner <span class="hint" style="display:inline">(1024×500 — інший розмір буде підігнано автоматично)</span></b></label>
+        <div class="drop small-drop" data-target="banner">Обрати banner</div>
+        <input type="file" id="file_banner" accept="image/*" hidden>
+        <div class="filelist" id="list_banner"></div>
+      </div>
+      <div>
+        <label class="fld"><b>Icon <span class="hint" style="display:inline">(512×512 — інший розмір буде підігнано автоматично)</span></b></label>
+        <div class="drop small-drop" data-target="icon">Обрати icon</div>
+        <input type="file" id="file_icon" accept="image/*" hidden>
+        <div class="filelist" id="list_icon"></div>
+      </div>
+      <div>
+        <label class="fld"><b>DATA SAFETY.mp4 або NO - DS.csv</b></label>
+        <div class="drop small-drop" data-target="ds">Обрати файл</div>
+        <input type="file" id="file_ds" accept=".mp4,.csv" hidden>
+        <div class="filelist" id="list_ds"></div>
+      </div>
+      <div>
+        <label class="fld"><b>Інші файли (за потреби)</b></label>
+        <div class="drop small-drop" data-target="other">Обрати файли</div>
+        <input type="file" id="file_other" multiple hidden>
+        <div class="filelist" id="list_other"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== AI ======== -->
+  <div class="card">
+    <h2>4. ASO описи (AI)</h2>
+
+    <label class="fld" style="margin-bottom:6px"><b>Стиль опису</b></label>
+    <div class="tones" id="tones">
+      <div class="tone sel" data-tone="normal" data-color="#2ecc71">
+        <span class="t-emoji">😊</span>
+        <b>Звичайний</b>
+        <p>Спокійний, інформативний опис. Чесно про функції, без тиску.</p>
+      </div>
+      <div class="tone" data-tone="semi" data-color="#e6a23c">
+        <span class="t-emoji">⚡</span>
+        <b>Напів-агресивний</b>
+        <p>Енергійний маркетинг: сильні заклики до дії, яскраві переваги.</p>
+      </div>
+      <div class="tone" data-tone="aggressive" data-color="#ff5c6c">
+        <span class="t-emoji">🔥</span>
+        <b>Агресивний</b>
+        <p>Максимум драйву: чіпляючі хуки, емоції, ургентність — але в межах правил Google Play.</p>
+      </div>
+    </div>
+    <p class="hint" style="margin-bottom:14px">Усі стилі безпечні для Google Play: без обману, вигаданих функцій, КАПСУ та заборонених заяв типу «додаток №1».</p>
+
+    <label class="fld" style="margin-bottom:6px"><b>Обсяг повного опису</b></label>
+    <div class="tones" id="sizes">
+      <div class="tone slim sel" data-size="small" data-color="#4f8cff">
+        <span class="t-emoji">📄</span>
+        <b>Невеликий</b>
+        <p>1300–1500 символів із пробілами</p>
+      </div>
+      <div class="tone slim" data-size="medium" data-color="#4f8cff">
+        <span class="t-emoji">📃</span>
+        <b>Середній</b>
+        <p>до 2500 символів із пробілами</p>
+      </div>
+      <div class="tone slim" data-size="large" data-color="#4f8cff">
+        <span class="t-emoji">📜</span>
+        <b>Великий</b>
+        <p>до 3500 символів із пробілами</p>
+      </div>
+    </div>
+
+    <div class="row">
+      <button class="btn" id="genBtn">✨ Згенерувати описи (Claude AI)</button>
+      <span class="hint">AI отримає назву, опис та скріншоти. Результат можна відредагувати перед створенням ZIP.</span>
+    </div>
+    <div class="status" id="genStatus"></div>
+    <div id="asoResults" style="display:none">
+      <hr class="sep">
+      <label class="fld"><b>Short description <span class="hint" id="shortCount" style="display:inline"></span></b>
+        <input type="text" id="shortDesc" maxlength="80">
+      </label>
+      <label class="fld"><b>Full description <span class="hint" id="fullCount" style="display:inline"></span></b>
+        <textarea id="fullDesc" style="min-height:220px"></textarea>
+      </label>
+      <div class="row">
+        <button class="btn small secondary" id="spamBtn">🔍 Перевірити на переспам</button>
+        <span class="hint">Аналог ASOMobile Text Analyzer: слово не має повторюватись більше ліміту. AI виправляє це автоматично при генерації.</span>
+      </div>
+      <div class="status" id="spamStatus"></div>
+      <div id="spamTable" class="filelist"></div>
+    </div>
+  </div>
+
+  <!-- ======== ZIP ======== -->
+  <div class="card">
+    <h2>5. Створити ZIP</h2>
+    <div class="row">
+      <button class="btn" id="zipBtn">📦 Створити та скачати ZIP</button>
+    </div>
+    <div class="status" id="zipStatus"></div>
+  </div>
+</div>
+
+<script>
+// ================= State =================
+const state = {
+  screenshots: [],          // {file, url}
+  selectedIdx: null,        // AI-selected order (array of indices) or null
+  files: { apk: [], aab: [], banner: [], icon: [], ds: [], other: [] }
+};
+
+const $ = id => document.getElementById(id);
+
+// ================= Screenshots upload =================
+const shotsDrop = $('shotsDrop'), shotsInput = $('shotsInput');
+shotsDrop.onclick = () => shotsInput.click();
+shotsInput.onchange = () => { addShots([...shotsInput.files]); shotsInput.value = ''; };
+;['dragover','dragleave','drop'].forEach(ev => shotsDrop.addEventListener(ev, e => {
+  e.preventDefault();
+  shotsDrop.classList.toggle('dragover', ev === 'dragover');
+  if (ev === 'drop') addShots([...e.dataTransfer.files].filter(f => f.type.startsWith('image/')));
+}));
+
+function addShots(files) {
+  for (const f of files) state.screenshots.push({ file: f, url: URL.createObjectURL(f) });
+  state.selectedIdx = null; // reset AI selection on change
+  renderShots();
+}
+
+function renderShots() {
+  const box = $('shotsThumbs');
+  box.innerHTML = '';
+  const sel = state.selectedIdx;
+  state.screenshots.forEach((s, i) => {
+    const d = document.createElement('div');
+    d.className = 'thumb' + (sel && !sel.includes(i) ? ' dim' : '');
+    const orderNum = sel ? (sel.indexOf(i) >= 0 ? sel.indexOf(i) + 1 : '—') : i + 1;
+    d.innerHTML = `<img src="${s.url}"><span class="num">${orderNum}</span><span class="x" title="Видалити">✕</span>` +
+      (sel && sel.includes(i) ? '<span class="badge">AI ✓</span>' : '');
+    d.querySelector('img').onclick = () => openLightbox(s.url);
+    d.querySelector('.x').onclick = () => {
+      URL.revokeObjectURL(s.url);
+      state.screenshots.splice(i, 1);
+      state.selectedIdx = null;
+      renderShots();
+    };
+    box.appendChild(d);
+  });
+}
+
+// ================= Other files upload =================
+document.querySelectorAll('.small-drop').forEach(drop => {
+  const key = drop.dataset.target;
+  const input = $('file_' + key);
+  drop.onclick = () => input.click();
+  ;['dragover','dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => {
+    e.preventDefault();
+    drop.classList.toggle('dragover', ev === 'dragover');
+    if (ev === 'drop') addFiles(key, [...e.dataTransfer.files]);
+  }));
+  input.onchange = () => { addFiles(key, [...input.files]); input.value = ''; };
+});
+
+// Обов'язкові розміри для Google Play
+const TARGET_SIZES = { icon: { w: 512, h: 512 }, banner: { w: 1024, h: 500 } };
+
+function addFiles(key, files) {
+  const multi = key === 'other';
+  if (!multi) state.files[key] = [];
+  state.files[key].push(...files);
+  renderFiles(key);
+  // Перевірка розмірів banner/icon
+  if (TARGET_SIZES[key]) {
+    for (const f of files) {
+      loadImg(f).then(img => {
+        const t = TARGET_SIZES[key];
+        f._dim = `${img.width}×${img.height}`;
+        f._willResize = img.width !== t.w || img.height !== t.h;
+        renderFiles(key);
+      }).catch(() => {});
+    }
+  }
+}
+
+function renderFiles(key) {
+  const box = $('list_' + key);
+  box.innerHTML = '';
+  state.files[key].forEach((f, i) => {
+    const c = document.createElement('span');
+    c.className = 'chip';
+    let extra = '';
+    if (f._dim) {
+      const t = TARGET_SIZES[key];
+      extra = f._willResize
+        ? ` <i style="color:#e6a23c;font-style:normal">${f._dim} → буде ${t.w}×${t.h}</i>`
+        : ` <i style="color:var(--green);font-style:normal">${f._dim} ✓</i>`;
+    }
+    c.innerHTML = `${f.name} <i style="color:var(--muted);font-style:normal">${fmtSize(f.size)}</i>${extra} <span class="x">✕</span>`;
+    c.querySelector('.x').onclick = () => { state.files[key].splice(i, 1); renderFiles(key); };
+    box.appendChild(c);
+  });
+}
+
+function loadImg(file) {
+  return new Promise((resolve, reject) => {
+    const i = new Image();
+    i.onload = () => resolve(i);
+    i.onerror = () => reject(new Error('Не вдалося прочитати ' + file.name));
+    i.src = URL.createObjectURL(file);
+  });
+}
+
+// Підганяє зображення точно під w×h; повертає {name, data(Blob|File), resized}
+async function fitImage(file, w, h) {
+  const img = await loadImg(file);
+  if (img.width === w && img.height === h) return { name: file.name, data: file, resized: false };
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  const type = file.type === 'image/jpeg' ? 'image/jpeg' : 'image/png';
+  if (type === 'image/jpeg') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h); }
+  ctx.drawImage(img, 0, 0, w, h);
+  const blob = await new Promise(r => c.toBlob(r, type, 0.95));
+  if (!blob) throw new Error('Не вдалося змінити розмір ' + file.name);
+  const ext = type === 'image/jpeg' ? 'jpg' : 'png';
+  return { name: file.name.replace(/\.[^.]+$/, '') + '.' + ext, data: blob, resized: true };
+}
+
+const fmtSize = b => b > 1048576 ? (b/1048576).toFixed(1)+' MB' : (b/1024).toFixed(0)+' KB';
+
+// ================= Tone selector =================
+let tone = 'normal';
+document.querySelectorAll('#tones .tone').forEach(t => {
+  t.style.setProperty('--tc', t.dataset.color);
+  t.onclick = () => {
+    document.querySelectorAll('#tones .tone').forEach(x => x.classList.remove('sel'));
+    t.classList.add('sel');
+    tone = t.dataset.tone;
+  };
+});
+
+// ================= Size selector =================
+let descSize = 'small';
+document.querySelectorAll('#sizes .tone').forEach(t => {
+  t.style.setProperty('--tc', t.dataset.color);
+  t.onclick = () => {
+    document.querySelectorAll('#sizes .tone').forEach(x => x.classList.remove('sel'));
+    t.classList.add('sel');
+    descSize = t.dataset.size;
+  };
+});
+
+// Лічильник символів повного опису
+const SIZE_MAX = { small: 1500, medium: 2500, large: 3500 };
+$('fullDesc').addEventListener('input', updFullCount);
+function updFullCount() {
+  const len = $('fullDesc').value.length;
+  const max = SIZE_MAX[descSize];
+  $('fullCount').textContent = `(${len} символів, ціль ≤ ${max})`;
+  $('fullCount').style.color = len > max ? 'var(--red)' : '';
+}
+
+// ================= Short description counter =================
+$('shortDesc').addEventListener('input', updCount);
+function updCount(){ $('shortCount').textContent = `(${$('shortDesc').value.length}/80)`; }
+
+// ================= AI generation =================
+$('genBtn').onclick = async () => {
+  const name = $('appName').value.trim();
+  const desc = $('devDescription').value.trim();
+  const st = $('genStatus');
+  st.className = 'status';
+  if (!name || !desc) { st.className = 'status err'; st.textContent = 'Заповніть назву додатку та опис від розробника.'; return; }
+  if (state.screenshots.length === 0) { st.className = 'status err'; st.textContent = 'Додайте хоча б один скріншот.'; return; }
+
+  $('genBtn').disabled = true;
+  st.innerHTML = '<span class="spinner"></span>Стискаю скріншоти та відправляю в Claude...';
+  try {
+    const thumbs = [];
+    for (const s of state.screenshots) thumbs.push(await compressImage(s.file, 800, 0.72));
+
+    st.innerHTML = '<span class="spinner"></span>Claude генерує описи' + (state.screenshots.length > 8 ? ', обирає 8 найкращих скріншотів' : '') + ' та перевіряє на переспам...';
+    const resp = await fetch('/api/aso', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        appName: name,
+        description: desc,
+        category: $('category').value.trim(),
+        tone,
+        size: descSize,
+        screenshots: thumbs
+      })
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || 'Помилка сервера');
+
+    $('shortDesc').value = data.shortDescription || '';
+    $('fullDesc').value = data.fullDescription || '';
+    $('asoResults').style.display = '';
+    updCount();
+    updFullCount();
+    if (data.selected) { state.selectedIdx = data.selected; renderShots(); }
+    st.className = 'status ok';
+    st.textContent = '✓ Готово! Перевірте описи — за потреби відредагуйте їх перед створенням ZIP.';
+    if (data.spamCheck) showSpam(data.spamCheck, true);
+  } catch (e) {
+    st.className = 'status err';
+    st.textContent = 'Помилка: ' + e.message;
+  }
+  $('genBtn').disabled = false;
+};
+
+// ================= Spam check (аналог ASOMobile Text Analyzer) =================
+function showSpam(sc, afterGen) {
+  const st = $('spamStatus');
+  const box = $('spamTable');
+  const limInfo = `щільність ≤ ${sc.densityLimit}%, тобто макс ${sc.maxAllowed} повторів при ${sc.totalWords} словах`;
+  if (sc.clean) {
+    st.className = 'status ok';
+    st.textContent = `✓ Переспаму немає (${limInfo})` +
+      (afterGen && sc.fixAttempts ? `. AI виправляв опис ${sc.fixAttempts} раз(и)` : '');
+  } else {
+    st.className = 'status err';
+    st.textContent = `⚠ Переспам: ${sc.remaining.map(w => `«${w.word}» ×${w.count} (${w.density}%)`).join(', ')} — ${limInfo}` +
+      (afterGen ? `. AI зробив ${sc.fixAttempts} спроб(и) виправлення — відредагуйте вручну або згенеруйте ще раз.` : '');
+  }
+  box.innerHTML = '';
+  (sc.frequency || []).slice(0, 24).forEach(w => {
+    const over = w.density > sc.densityLimit, warn = !over && w.count >= sc.maxAllowed;
+    const chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.title = `щільність ${w.density}%`;
+    chip.style.borderColor = over ? 'var(--red)' : warn ? '#e6a23c' : 'var(--border)';
+    chip.innerHTML = `${w.word} <b style="color:${over ? 'var(--red)' : warn ? '#e6a23c' : 'var(--green)'}">${w.count}</b>`;
+    box.appendChild(chip);
+  });
+}
+
+$('spamBtn').onclick = async () => {
+  const text = $('fullDesc').value.trim();
+  const st = $('spamStatus');
+  if (!text) { st.className = 'status err'; st.textContent = 'Full description порожній.'; return; }
+  st.className = 'status';
+  st.innerHTML = '<span class="spinner"></span>Перевіряю...';
+  try {
+    const resp = await fetch('/api/spam-check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    const data = await resp.json();
+    showSpam({
+      densityLimit: data.densityLimit, totalWords: data.totalWords, maxAllowed: data.maxAllowed,
+      clean: data.spam.length === 0, remaining: data.spam, frequency: data.frequency
+    }, false);
+  } catch (e) {
+    st.className = 'status err';
+    st.textContent = 'Помилка: ' + e.message;
+  }
+};
+
+// Compress image → {mediaType, data(base64)}
+function compressImage(file, maxDim, quality) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, maxDim / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(img.width * k));
+      c.height = Math.max(1, Math.round(img.height * k));
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      const dataUrl = c.toDataURL('image/jpeg', quality);
+      URL.revokeObjectURL(img.src);
+      resolve({ mediaType: 'image/jpeg', data: dataUrl.split(',')[1] });
+    };
+    img.onerror = () => reject(new Error('Не вдалося прочитати ' + file.name));
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+// ================= How to Publish.txt template =================
+function buildHowToPublish() {
+  return `GUIDE HOW TO PUBLISH --->  https://www.youtube.com/watch?v=fKbg_JvAB_8
+
+App title: ${$('appName').value.trim() || '***'}
+
+Policy: ${$('policy').value.trim() || '***'}
+
+Mail: ${$('mail').value.trim() || '***'}
+
+Website: ${$('website').value.trim() || '***'}
+
+Category: ${$('category').value.trim() || '***'}
+
+Target audience and content: ${$('audience').value.trim()}
+
+Content rating: ${$('rating').value.trim() || '3+'}
+
+Advirtising ID: ${$('advId').value}
+
+Short description: ${$('shortDesc').value.trim() || '***'}
+
+Full description: ${$('fullDesc').value.trim() || '***'}
+`;
+}
+
+// ================= ZIP build =================
+$('zipBtn').onclick = async () => {
+  const st = $('zipStatus');
+  st.className = 'status';
+  const name = $('appName').value.trim();
+  if (!name) { st.className = 'status err'; st.textContent = 'Заповніть назву додатку.'; return; }
+  if (state.screenshots.length === 0) { st.className = 'status err'; st.textContent = 'Додайте скріншоти.'; return; }
+  if (!$('shortDesc').value.trim() || !$('fullDesc').value.trim()) {
+    st.className = 'status err';
+    st.textContent = 'Спочатку згенеруйте описи (крок 4) або заповніть їх вручну.';
+    $('asoResults').style.display = '';
+    return;
+  }
+
+  $('zipBtn').disabled = true;
+  st.innerHTML = '<span class="spinner"></span>Збираю ZIP...';
+  try {
+    const zip = new JSZip();
+
+    // Screenshots: AI order (max 8) or all if ≤8
+    let order;
+    if (state.selectedIdx && state.selectedIdx.length) order = state.selectedIdx.slice(0, 8);
+    else order = state.screenshots.map((_, i) => i).slice(0, 8);
+    if (state.screenshots.length <= 8) order = state.screenshots.map((_, i) => i);
+
+    order.forEach((idx, n) => {
+      const f = state.screenshots[idx].file;
+      const ext = (f.name.match(/\.[a-z0-9]+$/i) || ['.png'])[0];
+      zip.file(`${n + 1}${ext}`, f);
+    });
+
+    for (const key of ['apk', 'aab', 'ds', 'other'])
+      for (const f of state.files[key]) zip.file(f.name, f);
+
+    // Banner та icon: автоматична підгонка під обов'язкові розміри + правильна назва файлу
+    const resizedNotes = [];
+    for (const key of ['banner', 'icon']) {
+      const t = TARGET_SIZES[key];
+      for (const f of state.files[key]) {
+        try {
+          st.innerHTML = `<span class="spinner"></span>Перевіряю розмір ${key}...`;
+          const r = await fitImage(f, t.w, t.h);
+          const ext = (r.name.match(/\.[a-z0-9]+$/i) || ['.png'])[0].toLowerCase();
+          zip.file(key + ext, r.data); // завжди icon.* / banner.*
+          if (r.resized) resizedNotes.push(`${key} → ${t.w}×${t.h}`);
+        } catch (e) {
+          // якщо не вдалося прочитати як зображення — кладемо як є, але з правильною назвою
+          const ext = (f.name.match(/\.[a-z0-9]+$/i) || [''])[0].toLowerCase();
+          zip.file(key + ext, f);
+        }
+      }
+    }
+
+    zip.file('How to Publish.txt', buildHowToPublish());
+
+    st.innerHTML = '<span class="spinner"></span>Стискаю архів (великі apk/aab можуть зайняти час)...';
+    const blob = await zip.generateAsync(
+      { type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } },
+      meta => { st.innerHTML = `<span class="spinner"></span>Стискаю архів... ${meta.percent.toFixed(0)}%`; }
+    );
+
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name.replace(/[\\/:*?"<>|]/g, '') + '.zip';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    st.className = 'status ok';
+    st.textContent = `✓ ZIP створено: ${a.download} (${fmtSize(blob.size)})` +
+      (resizedNotes.length ? `. Автоматично підігнано: ${resizedNotes.join(', ')}` : '');
+  } catch (e) {
+    st.className = 'status err';
+    st.textContent = 'Помилка: ' + e.message;
+  }
+  $('zipBtn').disabled = false;
+};
+</script>
+</body>
+</html>

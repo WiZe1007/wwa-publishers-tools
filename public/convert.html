@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Convert Images — WWA Publishers Tools</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔄</text></svg>">
+<link rel="stylesheet" href="css/style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="js/lightbox.js"></script>
+<script src="js/ui.js"></script>
+</head>
+<body>
+<nav>
+  <a class="brand" href="index.html">WWA <span>Publishers Tools</span></a>
+  <a class="link" href="zip.html">ZIP Creating</a>
+  <a class="link" href="resize.html">Resize the Image</a>
+  <a class="link active" href="convert.html">Convert Images</a>
+  <a class="link" href="merge.html">Merge Images</a>
+</nav>
+
+<div class="container">
+  <h1>🔄 Convert Images</h1>
+  <p class="subtitle">Конвертація зображень між форматами: PNG, JPEG, WebP, BMP, GIF, AVIF, ICO → PNG / JPEG / WebP / BMP. Пакетна обробка</p>
+
+  <div class="card">
+    <div class="drop" id="drop">
+      <span class="big">🖼️</span>
+      Перетягніть зображення сюди або натисніть, щоб обрати (можна декілька)
+    </div>
+    <input type="file" id="input" accept="image/*,.ico,.bmp,.avif" multiple hidden>
+    <div class="thumbs" id="thumbs"></div>
+  </div>
+
+  <div class="card" id="controls" style="display:none">
+    <h2>Налаштування</h2>
+    <div class="row">
+      <label class="fld" style="margin:0"><b>Конвертувати в</b>
+        <select id="format" style="width:160px">
+          <option value="image/png">PNG</option>
+          <option value="image/jpeg">JPEG</option>
+          <option value="image/webp">WebP</option>
+          <option value="image/bmp">BMP</option>
+        </select>
+      </label>
+      <label class="fld" style="margin:0"><b>Якість (JPEG/WebP): <span id="qv">92</span>%</b>
+        <input type="range" id="quality" min="10" max="100" value="92" style="width:180px">
+      </label>
+    </div>
+    <hr class="sep">
+    <div class="row">
+      <button class="btn" id="convertBtn">🔄 Конвертувати все</button>
+      <button class="btn secondary" id="zipBtn" style="display:none">📦 Скачати все як ZIP</button>
+      <span class="status" id="status" style="margin:0"></span>
+    </div>
+    <div class="filelist" id="results"></div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let files = [];       // {file, url}
+let converted = [];   // {name, blob}
+
+const drop = $('drop'), input = $('input');
+drop.onclick = () => input.click();
+input.onchange = () => { addFiles([...input.files]); input.value = ''; };
+;['dragover','dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => {
+  e.preventDefault();
+  drop.classList.toggle('dragover', ev === 'dragover');
+  if (ev === 'drop') addFiles([...e.dataTransfer.files]);
+}));
+
+function addFiles(list) {
+  for (const f of list) files.push({ file: f, url: URL.createObjectURL(f) });
+  render();
+  $('controls').style.display = files.length ? '' : 'none';
+}
+
+function render() {
+  const box = $('thumbs');
+  box.innerHTML = '';
+  files.forEach((f, i) => {
+    const d = document.createElement('div');
+    d.className = 'thumb';
+    d.innerHTML = `<img src="${f.url}" onerror="this.style.display='none'"><span class="size">${f.file.name}</span><span class="x">✕</span>`;
+    d.title = f.file.name;
+    d.querySelector('img').onclick = () => openLightbox(f.url);
+    d.querySelector('.x').onclick = () => { URL.revokeObjectURL(f.url); files.splice(i, 1); render(); $('controls').style.display = files.length ? '' : 'none'; };
+    box.appendChild(d);
+  });
+}
+
+$('quality').oninput = () => $('qv').textContent = $('quality').value;
+
+function loadImage(file) {
+  return new Promise((resolve, reject) => {
+    // createImageBitmap handles more formats (incl. AVIF/ICO in modern browsers)
+    createImageBitmap(file).then(resolve).catch(() => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error('Формат не підтримується браузером: ' + file.name));
+      i.src = URL.createObjectURL(file);
+    });
+  });
+}
+
+// BMP encoder (canvas.toBlob не підтримує BMP)
+function canvasToBMP(canvas) {
+  const w = canvas.width, h = canvas.height;
+  const ctx = canvas.getContext('2d');
+  const data = ctx.getImageData(0, 0, w, h).data;
+  const rowSize = Math.ceil(w * 3 / 4) * 4;
+  const size = 54 + rowSize * h;
+  const buf = new ArrayBuffer(size);
+  const v = new DataView(buf);
+  v.setUint8(0, 0x42); v.setUint8(1, 0x4D);
+  v.setUint32(2, size, true); v.setUint32(10, 54, true);
+  v.setUint32(14, 40, true);
+  v.setInt32(18, w, true); v.setInt32(22, -h, true); // top-down
+  v.setUint16(26, 1, true); v.setUint16(28, 24, true);
+  v.setUint32(34, rowSize * h, true);
+  let off = 54;
+  for (let y = 0; y < h; y++) {
+    let x = 0;
+    for (; x < w; x++) {
+      const p = (y * w + x) * 4;
+      // composite alpha over white
+      const a = data[p+3] / 255;
+      v.setUint8(off++, Math.round(data[p+2]*a + 255*(1-a)));
+      v.setUint8(off++, Math.round(data[p+1]*a + 255*(1-a)));
+      v.setUint8(off++, Math.round(data[p]*a + 255*(1-a)));
+    }
+    off += rowSize - w * 3;
+  }
+  return new Blob([buf], { type: 'image/bmp' });
+}
+
+$('convertBtn').onclick = async () => {
+  const st = $('status');
+  const type = $('format').value;
+  const q = $('quality').value / 100;
+  const ext = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/bmp': 'bmp' }[type];
+  converted = [];
+  $('results').innerHTML = '';
+  $('convertBtn').disabled = true;
+
+  let done = 0, failed = 0;
+  for (const f of files) {
+    st.innerHTML = `<span class="spinner"></span>Конвертую ${++done}/${files.length}...`;
+    try {
+      const img = await loadImage(f.file);
+      const c = document.createElement('canvas');
+      c.width = img.width; c.height = img.height;
+      const ctx = c.getContext('2d');
+      if (type === 'image/jpeg') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); }
+      ctx.drawImage(img, 0, 0);
+
+      let blob;
+      if (type === 'image/bmp') blob = canvasToBMP(c);
+      else blob = await new Promise(r => c.toBlob(r, type, q));
+      if (!blob) throw new Error('Не вдалося конвертувати');
+
+      const name = f.file.name.replace(/\.[^.]+$/, '') + '.' + ext;
+      converted.push({ name, blob });
+
+      const chip = document.createElement('span');
+      chip.className = 'chip';
+      const url = URL.createObjectURL(blob);
+      chip.innerHTML = `✓ <a href="${url}" download="${name}" style="color:var(--accent2)">${name}</a>`;
+      $('results').appendChild(chip);
+    } catch (e) {
+      failed++;
+      const chip = document.createElement('span');
+      chip.className = 'chip';
+      chip.innerHTML = `<span style="color:var(--red)">✕ ${f.file.name}</span>`;
+      $('results').appendChild(chip);
+    }
+  }
+  st.className = failed ? 'status err' : 'status ok';
+  st.textContent = failed ? `Готово з помилками: ${converted.length} ок, ${failed} не вдалося` : `✓ Конвертовано: ${converted.length}. Натисніть на файл, щоб скачати.`;
+  $('zipBtn').style.display = converted.length > 1 ? '' : 'none';
+  $('convertBtn').disabled = false;
+
+  // Auto-download if single file
+  if (converted.length === 1 && !failed) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(converted[0].blob);
+    a.download = converted[0].name;
+    a.click();
+  }
+};
+
+$('zipBtn').onclick = async () => {
+  const zip = new JSZip();
+  for (const c of converted) zip.file(c.name, c.blob);
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'converted_images.zip';
+  a.click();
+};
+</script>
+</body>
+</html>
