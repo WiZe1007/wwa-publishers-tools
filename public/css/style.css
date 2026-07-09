@@ -81,6 +81,9 @@ nav {
   flex-wrap: wrap;
 }
 nav .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   font-weight: 800;
   font-size: 16px;
   letter-spacing: .2px;
@@ -88,6 +91,12 @@ nav .brand {
   color: var(--text);
   text-decoration: none;
   white-space: nowrap;
+}
+nav .brand .brand-logo {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 6px rgba(77, 162, 255, .35));
 }
 nav .brand span { color: var(--accent2); }
 nav a.link {
