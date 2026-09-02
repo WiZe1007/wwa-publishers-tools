@@ -145,6 +145,34 @@ const TONE_INSTRUCTIONS = {
 ПРАВИЛА ЩІЛЬНОСТІ: головне ключове слово 3–5 разів на весь опис (точна форма + варіанти). Ніякого перенасичення — Google карає за keyword stuffing.
 СТРУКТУРА: у цьому стилі структуру задає методологія вище, але ВЕСЬ зміст (функції, механіки, особливості) бери виключно з опису розробника та скріншотів.
 ТОН: впевнений, професійний, орієнтований на вигоди. Емодзі — в булітах та заголовках.`,
+  tiktok_aso_pro: `Стиль опису — TIKTOK ASO PRO (методологія ASO Pro + шаблон social casino compliance):
+
+БАЗА — методологія ASO Pro: спочатку визнач 3–5 цільових ключових слів з назви, опису та скріншотів; у short description (після назви) — 2–3 ключові слова природно; головне ключове слово в перших 167 символах full description; щільність головного ключа 3–5 разів (точна форма + варіанти), без keyword stuffing.
+
+СТРУКТУРА FULL DESCRIPTION — строго за цим шаблоном (як у прикладі нижче):
+1. Хук-абзац: "[Назва додатку] — ..." + опиши додаток як "social casino experience" з "simulated" механікою (simulated chance / simulated luck), для розваги (entertainment), з "virtual challenge" та "in-app progress" і ЯВНО "without any real-money gambling".
+2. "How to Play:" — як проходить сесія, обов'язково з фразою "Players interact with virtual elements". Опиши реальні механіки з опису розробника/скріншотів.
+3. "Skill vs. Luck:" — чітко вкажи, що це social casino experience, centered on simulated luck; що результати virtual та "do not represent real-money gambling"; рішення гравця можуть впливати на сесію, але не гарантують виграш.
+4. "Prizes/Rewards:" — гравці отримують "virtual progress" та результати всередині додатку; "These have no real-world monetary value."
+5. "Cash Out Rules:" — ДОСЛІВНО цей текст: "Real-money cash-outs are strictly blocked. Virtual progress and results cannot be withdrawn, exchanged for cash, or redeemed for gift cards."
+6. "In-App Purchases:" — якщо в описі розробника покупки НЕ згадані, ДОСЛІВНО: "No in-app purchases are available. 18+. For entertainment purposes only." Якщо покупки згадані — чесно вкажи, що саме купується, і збережи "18+. For entertainment purposes only."
+
+ОБОВ'ЯЗКОВІ ФРАЗИ (мають бути в тексті): "social casino experience", "simulated luck" (або simulated chance), "virtual progress", "Players interact with virtual elements", "do not represent real-money gambling".
+ЕМОДЗІ: у цьому стилі НЕ використовуй емодзі — чистий формальний текст, як у шаблоні.
+ТОН: спокійний, професійний, розважальний контекст. Конкретні механіки та деталі — тільки з опису розробника і скріншотів.
+
+ПРИКЛАД РЕЗУЛЬТАТУ (для розуміння формату; зміст адаптуй під свій додаток):
+"７７７ Sl0ts — Enter a neon-inspired social casino experience where simulated chance meets an engaging virtual challenge. Take part for entertainment, pursue successful outcomes, and build your in-app progress without any real-money gambling.
+
+How to Play: Players interact with virtual elements, make choices during each session, and work toward completing the presented challenge. Successful solutions contribute to in-app progress and accuracy, while the available moves and conditions shape each attempt.
+
+Skill vs. Luck: ７７７ Sl0ts is presented as a social casino experience centered on simulated luck. Outcomes within the experience are virtual and do not represent real-money gambling. Player decisions may influence the session, but they do not guarantee a winning result.
+
+Prizes/Rewards: Players receive virtual progress and performance results within the app. These have no real-world monetary value.
+
+Cash Out Rules: Real-money cash-outs are strictly blocked. Virtual progress and results cannot be withdrawn, exchanged for cash, or redeemed for gift cards.
+
+In-App Purchases: No in-app purchases are available. 18+. For entertainment purposes only."`,
   aggressive: `Стиль опису — АГРЕСИВНИЙ (максимальний маркетинговий драйв):
 - Потужний чіпляючий хук з першого рядка, який неможливо проігнорувати.
 - Емоційні тригери: азарт, виклик, цікавість, страх пропустити ("your next adventure is waiting", "can you handle it?").
@@ -230,7 +258,7 @@ ${category ? `\nКатегорія: ${category}` : ''}
 
 Вимоги до результату:
 1. "short_description" — короткий опис для Google Play, англійською, СТРОГО не більше 80 символів включно (порахуй символи!). Формат обов'язковий: назва додатку, потім двокрапка або знак оклику, потім основна частина, а В КІНЦІ — знак оклику або крапка. Приклад: "${appName}: main catchy part here!" або "${appName}! main catchy part here."
-2. "full_description" — повний опис для Google Play, англійською. ${SIZE_INSTRUCTIONS[size] || SIZE_INSTRUCTIONS.small} ОБОВ'ЯЗКОВО використовуй доречні емодзі: на початку ключових абзаців, у заголовках секцій (наприклад "🎮 HOW TO PLAY", "⭐ GAME FEATURES") та як марери пунктів списку функцій (замість "•" — тематичні емодзі: 🧩 ⚡ 🏆 🎯 💎 🔥 тощо, підбирай під зміст). Емодзі мають виглядати органічно, не більше 1-2 поспіль.
+2. "full_description" — повний опис для Google Play, англійською. ${SIZE_INSTRUCTIONS[size] || SIZE_INSTRUCTIONS.small} Якщо інструкція стилю нижче не вказує інакше — ОБОВ'ЯЗКОВО використовуй доречні емодзі: на початку ключових абзаців, у заголовках секцій (наприклад "🎮 HOW TO PLAY", "⭐ GAME FEATURES") та як марери пунктів списку функцій (замість "•" — тематичні емодзі: 🧩 ⚡ 🏆 🎯 💎 🔥 тощо, підбирай під зміст). Емодзі мають виглядати органічно, не більше 1-2 поспіль.
 
 ${TONE_INSTRUCTIONS[tone] || TONE_INSTRUCTIONS.normal}
 
@@ -299,7 +327,8 @@ Rewrite the description so that:
 2. The meaning, features and overall length stay the same.
 3. Do NOT add features that are not mentioned.
 4. Keep it natural, high-quality English for Google Play.
-5. Keep the same marketing tone and energy as the original text, including all emojis and formatting.
+5. Keep the same marketing tone and energy as the original text, including all emojis and formatting.${tone === 'tiktok_aso_pro' ? `
+6. CRITICAL: Do NOT modify the mandatory compliance sentences ("Cash Out Rules: Real-money cash-outs are strictly blocked..." and "In-App Purchases: ...") and do NOT remove the required phrases: "social casino experience", "simulated luck", "virtual progress", "Players interact with virtual elements", "do not represent real-money gambling". Reduce word repetition ONLY in other parts of the text.` : ''}
 
 Description:
 ${fullDescription}
