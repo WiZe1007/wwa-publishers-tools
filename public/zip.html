@@ -193,6 +193,7 @@
       </label>
       <div class="row">
         <button class="btn small secondary" id="spamBtn">🔍 Перевірити на переспам</button>
+        <button class="btn small secondary" id="fixSpamBtn" style="display:none">🛠 Виправити переспам (AI)</button>
         <span class="hint">Аналог ASOMobile Text Analyzer: слово не має повторюватись більше ліміту. AI виправляє це автоматично при генерації.</span>
       </div>
       <div class="status" id="spamStatus"></div>
@@ -436,6 +437,7 @@ function showSpam(sc, afterGen) {
     st.textContent = `⚠ Переспам: ${sc.remaining.map(w => `«${w.word}» ×${w.count} (${w.density}%)`).join(', ')} — ${limInfo}` +
       (afterGen ? `. AI зробив ${sc.fixAttempts} спроб(и) виправлення — відредагуйте вручну або згенеруйте ще раз.` : '');
   }
+  $('fixSpamBtn').style.display = sc.clean ? 'none' : '';
   box.innerHTML = '';
   (sc.frequency || []).slice(0, 24).forEach(w => {
     const over = w.density > sc.densityLimit, warn = !over && w.count >= sc.maxAllowed;
@@ -447,6 +449,44 @@ function showSpam(sc, afterGen) {
     box.appendChild(chip);
   });
 }
+
+// Перевірка тексту на переспам; повертає spamCheck або null
+async function runSpamCheck(text) {
+  const resp = await fetch('/api/spam-check', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text })
+  });
+  const d = await resp.json();
+  if (!resp.ok) throw new Error(d.error || 'Помилка перевірки');
+  return { densityLimit: d.densityLimit, totalWords: d.totalWords, maxAllowed: d.maxAllowed,
+           clean: d.spam.length === 0, remaining: d.spam, frequency: d.frequency };
+}
+
+$('fixSpamBtn').onclick = async () => {
+  const st = $('spamStatus');
+  const text = $('fullDesc').value.trim();
+  if (!text) return;
+  $('fixSpamBtn').disabled = true;
+  st.className = 'status';
+  st.innerHTML = '<span class="spinner"></span>AI переписує опис без переспаму...';
+  try {
+    const resp = await fetch('/api/fix-spam', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, appName: $('appName').value.trim() })
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || 'Помилка сервера');
+    $('fullDesc').value = data.fullDescription;
+    updFullCount();
+    showSpam(data.spamCheck, true);
+  } catch (e) {
+    st.className = 'status err';
+    st.textContent = 'Помилка: ' + e.message;
+  }
+  $('fixSpamBtn').disabled = false;
+};
 
 $('spamBtn').onclick = async () => {
   const text = $('fullDesc').value.trim();
@@ -517,6 +557,11 @@ Full description: ${$('fullDesc').value.trim() || '***'}
 }
 
 // ================= ZIP build =================
+let zipForce = false;
+$('fullDesc').addEventListener('input', () => {
+  if (zipForce) { zipForce = false; $('zipBtn').textContent = '📦 Створити та скачати ZIP'; }
+});
+
 $('zipBtn').onclick = async () => {
   const st = $('zipStatus');
   st.className = 'status';
@@ -530,7 +575,26 @@ $('zipBtn').onclick = async () => {
     return;
   }
 
+  // Фінальна перевірка опису на переспам (у т.ч. якщо його редагували вручну)
   $('zipBtn').disabled = true;
+  try {
+    st.innerHTML = '<span class="spinner"></span>Перевіряю опис на переспам...';
+    const sc = await runSpamCheck($('fullDesc').value.trim());
+    showSpam(sc, false);
+    if (!sc.clean) {
+      $('zipBtn').disabled = false;
+      st.className = 'status err';
+      st.textContent = `⚠ У повному описі є переспам: ${sc.remaining.map(w => `«${w.word}» ×${w.count}`).join(', ')}. ` +
+        'Натисніть «🛠 Виправити переспам (AI)» вище, або створіть ZIP примусово ще раз натиснувши кнопку.';
+      if (!zipForce) { zipForce = true; $('zipBtn').textContent = '📦 Все одно створити ZIP'; return; }
+    }
+  } catch (e) {
+    console.warn('Spam pre-check failed:', e.message);
+  }
+  zipForce = false;
+  $('zipBtn').textContent = '📦 Створити та скачати ZIP';
+
+  st.className = 'status';
   st.innerHTML = '<span class="spinner"></span>Збираю ZIP...';
   try {
     const zip = new JSZip();

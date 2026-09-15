@@ -199,6 +199,14 @@ In-App Purchases: No in-app purchases are available. 18+. For entertainment purp
 };
 
 // ===== Обсяг повного опису =====
+// Максимум повторів одного слова: щільність ≤ SPAM_DENSITY% від очікуваної кількості слів,
+// мінус 1 як запас міцності (слова ≈ 6.2 символи з пробілом)
+const SIZE_MAX_REPEATS = {
+  small: 4,   // ~1400 симв. ≈ 225 слів → 5, з запасом 4
+  medium: 8,  // ~2400 симв. ≈ 385 слів → 9, з запасом 8
+  large: 12   // ~3400 симв. ≈ 545 слів → 13, з запасом 12
+};
+
 const SIZE_INSTRUCTIONS = {
   small: 'Обсяг повного опису: 1300–1500 символів ВКЛЮЧНО З ПРОБІЛАМИ. Не менше 1300 і не більше 1500.',
   medium: 'Обсяг повного опису: до 2500 символів ВКЛЮЧНО З ПРОБІЛАМИ (орієнтовно 2000–2500).',
@@ -232,6 +240,65 @@ async function callClaude(content) {
 function extractJSON(text) {
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   return JSON.parse(jsonMatch ? jsonMatch[0] : text);
+}
+
+// Виправлення переспаму в довільному (в т.ч. відредагованому вручну) тексті
+app.post('/api/fix-spam', async (req, res) => {
+  try {
+    if (!API_KEY) return res.status(500).json({ error: 'ANTHROPIC_API_KEY не налаштований на сервері.' });
+    let text = String((req.body || {}).text || '').trim();
+    const appName = String((req.body || {}).appName || 'the app');
+    if (!text) return res.status(400).json({ error: 'Текст порожній.' });
+
+    let analysis = analyzeText(text);
+    if (analysis.spam.length === 0) {
+      return res.json({ fullDescription: text, fixAttempts: 0, spamCheck: buildSpamCheck(analysis, 0) });
+    }
+
+    const scoreOf = a => a.spam.reduce((s, w) => s + (w.density - SPAM_DENSITY), 0) + a.spam.length * 0.01;
+    let best = { text, analysis };
+    let attempts = 0;
+
+    while (analysis.spam.length > 0 && attempts < 5) {
+      attempts++;
+      const safeMax = Math.max(1, analysis.maxAllowed - 1);
+      const prompt = `Below is a Google Play full description for the app "${appName}".
+A keyword-spam check found over-used words. All forms of a word count together (singular + plural + -ing/-ed + inside hyphenated words). The text has ${analysis.totalWords} words.
+
+Over-used words:
+${analysis.spam.map(s => `- "${s.word}" — used ${s.count} times (${s.density}%), must appear at most ${safeMax} times`).join('\n')}
+
+Rewrite so every listed word appears at most ${safeMax} times. Keep the meaning, features, structure, emojis, formatting and overall length unchanged. Do not add features. Before answering, count the occurrences in your rewrite and fix again if any is still above the limit.
+
+Description:
+${text}
+
+Respond STRICTLY as JSON without markdown:
+{"full_description": "..."}`;
+      const fixed = extractJSON(await callClaude([{ type: 'text', text: prompt }]));
+      if (fixed.full_description) text = String(fixed.full_description);
+      analysis = analyzeText(text);
+      if (scoreOf(analysis) < scoreOf(best.analysis)) best = { text, analysis };
+    }
+
+    if (scoreOf(analysis) > scoreOf(best.analysis)) { text = best.text; analysis = best.analysis; }
+    res.json({ fullDescription: text, fixAttempts: attempts, spamCheck: buildSpamCheck(analysis, attempts) });
+  } catch (err) {
+    console.error(err);
+    res.status(err.api ? 502 : 500).json({ error: err.message });
+  }
+});
+
+function buildSpamCheck(a, fixAttempts) {
+  return {
+    densityLimit: SPAM_DENSITY,
+    totalWords: a.totalWords,
+    maxAllowed: a.maxAllowed,
+    fixAttempts,
+    clean: a.spam.length === 0,
+    remaining: a.spam,
+    frequency: a.frequency.slice(0, 50)
+  };
 }
 
 // Окремий endpoint: перевірка тексту на переспам (для кнопки на сторінці)
@@ -287,7 +354,7 @@ ${TONE_INSTRUCTIONS[tone] || TONE_INSTRUCTIONS.normal}
 - Емодзі дозволені ТІЛЬКИ у full_description. У short_description — ЗАБОРОНЕНІ (політика Google Play), там лише текст і розділові знаки.
 - Без неперевірених заяв типу "#1 app", "the best app", без згадок конкурентів, рейтингів чи цін.
 - Опис має пройти модерацію Google Play без ризику блокування.
-- АНТИ-ПЕРЕСПАМ: не повторюй жодне значуще слово (включно з усіма його формами: множина, -ing, -ed, у складених словах через дефіс) частіше ніж ~2 рази на кожні 100 слів тексту. Наприклад, у тексті на 220 слів — максимум 5 повторів одного слова. Активно використовуй синоніми.`;
+- АНТИ-ПЕРЕСПАМ (дуже важливо, перевіряється автоматично): жодне значуще слово не має вживатися більше ніж ${SIZE_MAX_REPEATS[size] || SIZE_MAX_REPEATS.small} разів на весь опис. Рахуються РАЗОМ усі форми слова: однина+множина (tile/tiles), дієслівні форми (tap/taps/tapping/tapped), а також входження у складені слова через дефіс (tile-matching = tile + matching). Перед відповіддю подумки перелічи входження найчастіших слів і, якщо якесь перевищує ліміт, перепиши через синоніми, займенники або інше формулювання. Це стосується і назви додатку, якщо вона складається зі звичайних слів.`;
 
     if (needSelection) {
       task += `
@@ -326,21 +393,31 @@ ${TONE_INSTRUCTIONS[tone] || TONE_INSTRUCTIONS.normal}
     let fullDescription = String(parsed.full_description || '');
     let analysis = analyzeText(fullDescription);
     let fixAttempts = 0;
-    const MAX_FIX = 3;
+    const MAX_FIX = 5;
+
+    // Запам'ятовуємо найкращий варіант (раптом чергова спроба зробить гірше)
+    let best = { text: fullDescription, analysis };
+    const score = a => a.spam.reduce((s, w) => s + (w.density - SPAM_DENSITY), 0) + a.spam.length * 0.01;
 
     while (analysis.spam.length > 0 && fixAttempts < MAX_FIX) {
       fixAttempts++;
       console.log(`Spam fix attempt ${fixAttempts}:`, analysis.spam.map(s => `${s.word}(${s.count}, ${s.density}%)`).join(', '));
       try {
         const safeMax = Math.max(1, analysis.maxAllowed - 1); // запас міцності на різницю в підрахунку
+        // Слова на межі — теж просимо трохи розвантажити, щоб не з'явився переспам після правок
+        const borderline = analysis.frequency.filter(w =>
+          !analysis.spam.some(s => s.word === w.word) && w.count >= safeMax
+        ).slice(0, 6);
         const fixPrompt = `Below is a full description for Google Play for the app "${appName}".
 A keyword-spam check (ASOMobile Text Analyzer) found over-used words. Rule: a word's density must not exceed ${SPAM_DENSITY}% of the total word count. The text has ${analysis.totalWords} words. All forms of a word count together: singular + plural + -ing/-ed forms + inside hyphenated words (tap + taps + tapping + tapped + tap-to-win all count as "tap").
 
-Over-used words:
-${analysis.spam.map(s => `- "${s.word}" — used ${s.count} times (${s.density}%), allowed max ${safeMax}`).join('\n')}
-
+Over-used words (MUST be reduced):
+${analysis.spam.map(s => `- "${s.word}" — used ${s.count} times (${s.density}%), must appear at most ${safeMax} times (remove at least ${s.count - safeMax})`).join('\n')}
+${borderline.length ? `\nBorderline words (close to the limit — reduce by 1 if possible):\n${borderline.map(w => `- "${w.word}" — used ${w.count} times`).join('\n')}\n` : ''}
 Rewrite the description so that:
 1. Each of these words (counting ALL its forms) appears no more than ${safeMax} times — replace extra occurrences with synonyms or rephrase. Do not simply delete sentences; keep overall length similar.
+1a. BEFORE answering, mentally count every occurrence of each listed word in your rewritten text (including plural, -ing/-ed forms and occurrences inside hyphenated words). If any is still above ${safeMax}, rewrite again before responding.
+1b. Prefer replacing a repeated noun with a pronoun ("it", "they") or a synonym, merging two sentences, or rephrasing the idea — rather than deleting content.
 2. The meaning, features and overall length stay the same.
 3. Do NOT add features that are not mentioned.
 4. Keep it natural, high-quality English for Google Play.
@@ -355,11 +432,19 @@ Respond STRICTLY as JSON without markdown:
         const fixed = extractJSON(await callClaude([{ type: 'text', text: fixPrompt }]));
         if (fixed.full_description) fullDescription = String(fixed.full_description);
         analysis = analyzeText(fullDescription);
+        if (score(analysis) < score(best.analysis)) best = { text: fullDescription, analysis };
       } catch (e) {
         console.error('Spam fix failed:', e.message);
         break;
       }
     }
+
+    // Якщо остання спроба гірша за найкращу — повертаємо найкращу
+    if (score(analysis) > score(best.analysis)) {
+      fullDescription = best.text;
+      analysis = best.analysis;
+    }
+    console.log(`Spam check result: ${analysis.spam.length === 0 ? 'CLEAN' : 'STILL SPAM: ' + analysis.spam.map(s => `${s.word}(${s.count})`).join(', ')} after ${fixAttempts} fix(es)`);
 
     let shortDescription = String(parsed.short_description || '').trim();
     if (shortDescription.length > 80) {
