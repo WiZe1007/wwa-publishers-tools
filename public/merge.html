@@ -8,15 +8,30 @@
 <link rel="stylesheet" href="css/style.css">
 <script src="js/lightbox.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/nav.js" defer></script>
 </head>
 <body class="tool-page">
 <nav>
-  <a class="brand" href="index.html"><img src="img/logo.png" alt="" class="brand-logo">WWA <span>Publishers Tools</span></a>
-  <a class="link" href="zip.html">ZIP Creating</a>
-  <a class="link" href="resize.html">Resize the Image</a>
-  <a class="link" href="convert.html">Convert Images</a>
-  <a class="link active" href="merge.html">Merge Images</a>
+  <a class="brand" href="index.html"><img src="img/logo.png" alt="" class="brand-logo">wwa<span>tools</span></a>
+  <div class="nav-links">
+    <a class="link" href="zip.html">ZIP Creating</a>
+    <a class="link" href="resize.html">Resize</a>
+    <a class="link" href="convert.html">Convert</a>
+    <a class="link active" href="merge.html">Merge</a>
+  </div>
+  <a class="pill" href="index.html">На головну</a>
+  <button class="burger" type="button" aria-label="Меню" aria-expanded="false" aria-controls="mobile-menu">
+    <span></span><span></span><span></span>
+  </button>
 </nav>
+<div class="menu-backdrop" id="menu-backdrop"></div>
+<div class="mobile-menu" id="mobile-menu">
+    <a class="link" href="zip.html">ZIP Creating</a>
+    <a class="link" href="resize.html">Resize</a>
+    <a class="link" href="convert.html">Convert</a>
+    <a class="link active" href="merge.html">Merge</a>
+  <a class="pill" href="index.html">На головну</a>
+</div>
 
 <div class="container">
   <h1>🧩 Merge Images</h1>
@@ -57,7 +72,7 @@
         <input type="number" id="gap" min="0" value="0" style="width:100px">
       </label>
       <label class="fld" style="margin:0"><b>Колір фону</b>
-        <input type="color" id="bgColor" value="#ffffff" style="width:60px;height:40px;padding:3px;background:var(--bg);border:1px solid var(--border);border-radius:9px;cursor:pointer">
+        <input type="color" id="bgColor" value="#ffffff" style="width:64px;height:44px;padding:4px;background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:12px;cursor:pointer">
       </label>
       <label class="check" style="padding-top:18px">
         <input type="checkbox" id="transparent" checked> Прозорий фон (PNG)

@@ -9,15 +9,30 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="js/lightbox.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/nav.js" defer></script>
 </head>
 <body class="tool-page">
 <nav>
-  <a class="brand" href="index.html"><img src="img/logo.png" alt="" class="brand-logo">WWA <span>Publishers Tools</span></a>
-  <a class="link" href="zip.html">ZIP Creating</a>
-  <a class="link active" href="resize.html">Resize the Image</a>
-  <a class="link" href="convert.html">Convert Images</a>
-  <a class="link" href="merge.html">Merge Images</a>
+  <a class="brand" href="index.html"><img src="img/logo.png" alt="" class="brand-logo">wwa<span>tools</span></a>
+  <div class="nav-links">
+    <a class="link" href="zip.html">ZIP Creating</a>
+    <a class="link active" href="resize.html">Resize</a>
+    <a class="link" href="convert.html">Convert</a>
+    <a class="link" href="merge.html">Merge</a>
+  </div>
+  <a class="pill" href="index.html">На головну</a>
+  <button class="burger" type="button" aria-label="Меню" aria-expanded="false" aria-controls="mobile-menu">
+    <span></span><span></span><span></span>
+  </button>
 </nav>
+<div class="menu-backdrop" id="menu-backdrop"></div>
+<div class="mobile-menu" id="mobile-menu">
+    <a class="link" href="zip.html">ZIP Creating</a>
+    <a class="link active" href="resize.html">Resize</a>
+    <a class="link" href="convert.html">Convert</a>
+    <a class="link" href="merge.html">Merge</a>
+  <a class="pill" href="index.html">На головну</a>
+</div>
 
 <div class="container">
   <h1>📐 Resize the Image</h1>
@@ -195,7 +210,7 @@ $('resizeBtn').onclick = async () => {
       const chip = document.createElement('span');
       chip.className = 'chip';
       const url = URL.createObjectURL(r.blob);
-      chip.innerHTML = `✓ <a href="${url}" download="${r.name}" style="color:var(--accent2)">${r.name}</a> <i style="color:var(--muted);font-style:normal">${r.w}×${r.h}</i>`;
+      chip.innerHTML = `✓ <a href="${url}" download="${r.name}" style="color:var(--accent)">${r.name}</a> <i style="color:var(--muted);font-style:normal">${r.w}×${r.h}</i>`;
       $('results').appendChild(chip);
     } catch (e) {
       failed++;
