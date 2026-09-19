@@ -205,6 +205,12 @@
   <div class="card">
     <h2>5. Створити ZIP</h2>
     <div class="row">
+      <button class="btn secondary" id="cleanMetaBtn">🧹 Очистити метадані файлів</button>
+      <span class="hint">Видаляє EXIF із зображень: модель пристрою, GPS-координати, дату зйомки, програму-редактор. Також уніфікує часові мітки всередині архіву.</span>
+    </div>
+    <div class="status" id="cleanStatus"></div>
+    <hr class="sep">
+    <div class="row">
       <button class="btn" id="zipBtn">📦 Створити та скачати ZIP</button>
     </div>
     <div class="status" id="zipStatus"></div>
@@ -234,6 +240,7 @@ shotsInput.onchange = () => { addShots([...shotsInput.files]); shotsInput.value 
 function addShots(files) {
   for (const f of files) state.screenshots.push({ file: f, url: URL.createObjectURL(f) });
   state.selectedIdx = null; // reset AI selection on change
+  resetMetaClean();
   renderShots();
 }
 
@@ -278,6 +285,7 @@ function addFiles(key, files) {
   const multi = key === 'other';
   if (!multi) state.files[key] = [];
   state.files[key].push(...files);
+  resetMetaClean();
   renderFiles(key);
   // Перевірка розмірів banner/icon
   if (TARGET_SIZES[key]) {
@@ -556,6 +564,100 @@ Full description: ${$('fullDesc').value.trim() || '***'}
 `;
 }
 
+// ================= Очищення метаданих =================
+let metaCleaned = false;
+
+// Нові файли після очищення — скидаємо статус, щоб не потрапили неочищеними
+function resetMetaClean() {
+  if (!metaCleaned) return;
+  metaCleaned = false;
+  const st = document.getElementById('cleanStatus');
+  if (st) {
+    st.className = 'status err';
+    st.textContent = '⚠ Додано нові файли — натисніть «Очистити метадані» ще раз.';
+  }
+}
+
+// Перемальовуємо зображення через canvas — це відкидає EXIF/XMP/ICC та інші теги
+function stripImageMetadata(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = img.width; c.height = img.height;
+      const ctx = c.getContext('2d');
+      let type = file.type;
+      if (!['image/png', 'image/jpeg', 'image/webp'].includes(type)) type = 'image/png';
+      if (type === 'image/jpeg') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); }
+      ctx.drawImage(img, 0, 0);
+      c.toBlob(blob => {
+        URL.revokeObjectURL(url);
+        if (!blob) return reject(new Error('Не вдалося обробити ' + file.name));
+        // Ім'я зберігаємо, час файлу — нейтральний
+        resolve(new File([blob], file.name, { type, lastModified: FIXED_DATE.getTime() }));
+      }, type, type === 'image/jpeg' ? 0.96 : undefined);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Не зображення: ' + file.name)); };
+    img.src = url;
+  });
+}
+
+const FIXED_DATE = new Date('2020-01-01T00:00:00Z');
+const isImage = f => (f.type || '').startsWith('image/');
+
+$('cleanMetaBtn').onclick = async () => {
+  const st = $('cleanStatus');
+  st.className = 'status';
+  let cleaned = 0, skipped = [], failed = 0;
+
+  $('cleanMetaBtn').disabled = true;
+  st.innerHTML = '<span class="spinner"></span>Очищаю метадані...';
+
+  try {
+    // Скріншоти
+    for (let i = 0; i < state.screenshots.length; i++) {
+      try {
+        const nf = await stripImageMetadata(state.screenshots[i].file);
+        URL.revokeObjectURL(state.screenshots[i].url);
+        state.screenshots[i] = { file: nf, url: URL.createObjectURL(nf) };
+        cleaned++;
+      } catch (e) { failed++; }
+    }
+    renderShots();
+
+    // Інші файли
+    for (const key of ['apk', 'aab', 'banner', 'icon', 'ds', 'other']) {
+      for (let i = 0; i < state.files[key].length; i++) {
+        const f = state.files[key][i];
+        if (isImage(f)) {
+          try {
+            const nf = await stripImageMetadata(f);
+            nf._dim = f._dim; nf._willResize = f._willResize;
+            state.files[key][i] = nf;
+            cleaned++;
+          } catch (e) { failed++; }
+        } else {
+          const ext = (f.name.match(/\.[a-z0-9]+$/i) || [''])[0].toLowerCase();
+          if (!skipped.includes(ext) && ext) skipped.push(ext);
+        }
+      }
+      renderFiles(key);
+    }
+
+    metaCleaned = true;
+    st.className = 'status ok';
+    st.textContent = `✓ Очищено метадані: ${cleaned} зображень` +
+      (failed ? `, не вдалося: ${failed}` : '') +
+      `. Часові мітки в архіві буде уніфіковано.` +
+      (skipped.length ? ` Не чіпалися (щоб не пошкодити): ${skipped.join(', ')}.` : '');
+  } catch (e) {
+    st.className = 'status err';
+    st.textContent = 'Помилка: ' + e.message;
+  }
+  $('cleanMetaBtn').disabled = false;
+};
+
 // ================= ZIP build =================
 let zipForce = false;
 $('fullDesc').addEventListener('input', () => {
@@ -605,14 +707,17 @@ $('zipBtn').onclick = async () => {
     else order = state.screenshots.map((_, i) => i).slice(0, 8);
     if (state.screenshots.length <= 8) order = state.screenshots.map((_, i) => i);
 
+    // Якщо метадані чистили — однакова часова мітка для всіх записів архіву
+    const zipOpts = metaCleaned ? { date: FIXED_DATE } : undefined;
+
     order.forEach((idx, n) => {
       const f = state.screenshots[idx].file;
       const ext = (f.name.match(/\.[a-z0-9]+$/i) || ['.png'])[0];
-      zip.file(`${n + 1}${ext}`, f);
+      zip.file(`${n + 1}${ext}`, f, zipOpts);
     });
 
     for (const key of ['apk', 'aab', 'ds', 'other'])
-      for (const f of state.files[key]) zip.file(f.name, f);
+      for (const f of state.files[key]) zip.file(f.name, f, zipOpts);
 
     // Banner та icon: автоматична підгонка під обов'язкові розміри + правильна назва файлу
     const resizedNotes = [];
@@ -623,17 +728,17 @@ $('zipBtn').onclick = async () => {
           st.innerHTML = `<span class="spinner"></span>Перевіряю розмір ${key}...`;
           const r = await fitImage(f, t.w, t.h);
           const ext = (r.name.match(/\.[a-z0-9]+$/i) || ['.png'])[0].toLowerCase();
-          zip.file(key + ext, r.data); // завжди icon.* / banner.*
+          zip.file(key + ext, r.data, zipOpts); // завжди icon.* / banner.*
           if (r.resized) resizedNotes.push(`${key} → ${t.w}×${t.h}`);
         } catch (e) {
           // якщо не вдалося прочитати як зображення — кладемо як є, але з правильною назвою
           const ext = (f.name.match(/\.[a-z0-9]+$/i) || [''])[0].toLowerCase();
-          zip.file(key + ext, f);
+          zip.file(key + ext, f, zipOpts);
         }
       }
     }
 
-    zip.file('How to Publish.txt', buildHowToPublish());
+    zip.file('How to Publish.txt', buildHowToPublish(), zipOpts);
 
     st.innerHTML = '<span class="spinner"></span>Стискаю архів (великі apk/aab можуть зайняти час)...';
     const blob = await zip.generateAsync(
