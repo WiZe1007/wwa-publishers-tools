@@ -39,16 +39,16 @@ body{
   overflow-x:hidden; position:relative;
 }
 
-/* ── Layer 2: hero photo + scrim ── */
+/* ── Layer 2: hero video, 100% opacity, no overlay ── */
 .hero-photo{
   position:fixed; inset:0; z-index:0;
-  background:url('img/bg.jpg') center / cover no-repeat;
+  overflow:hidden; background:#000;
 }
-.hero-photo::after{
-  content:''; position:absolute; inset:0;
-  background:
-    radial-gradient(1100px circle at 50% 108%, rgba(0,0,0,.35), transparent 62%),
-    linear-gradient(180deg, rgba(0,0,0,.72) 0%, rgba(0,0,0,.55) 38%, rgba(0,0,0,.92) 100%);
+.hero-photo video{
+  position:absolute; inset:0;
+  width:100%; height:100%;
+  object-fit:cover; display:block;
+  opacity:1;
 }
 
 /* ── Layer 4: grain ── */
@@ -361,7 +361,10 @@ body.menu-open .burger i:nth-child(3){ transform:translateY(-6.5px) rotate(-45de
 <body style="background:#000;color:#fff">
 
 <div class="grain" aria-hidden="true"></div>
-<div class="hero-photo" aria-hidden="true"></div>
+<div class="hero-photo" aria-hidden="true">
+  <video autoplay muted loop playsinline preload="auto"
+         src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260818_072341_50851634-bbc3-4c33-9acc-7647d4db44aa.mp4"></video>
+</div>
 
 <div class="page">
   <div class="menu-backdrop" aria-hidden="true"></div>
