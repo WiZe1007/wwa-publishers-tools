@@ -22,7 +22,8 @@ html[data-theme=dark] .tool-page::before{background:linear-gradient(110deg,#0916
 .app-shell{display:flex;flex-direction:column;max-width:none;min-height:100svh;margin:0;border:0;border-radius:0;background:none;box-shadow:none;overflow:visible;backdrop-filter:none;-webkit-backdrop-filter:none}
 .app-main{min-width:0;backdrop-filter:none;-webkit-backdrop-filter:none}
 .topbar{display:none}
-.tool-page .app-main{width:calc(100% - 64px);max-width:1120px;margin:0 auto 32px;border:1px solid var(--glass-edge);border-radius:22px;background:var(--glass-shell);box-shadow:0 24px 70px #0000002e,inset 0 1px #ffffff0e;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);flex:initial}
+/* Avoid re-filtering a multi-screen form on every decoded video frame. */
+.tool-page .app-main{width:calc(100% - 64px);max-width:1120px;margin:0 auto 32px;border:1px solid var(--glass-edge);border-radius:22px;background:var(--glass-shell),#0a121f8c;box-shadow:0 24px 70px #0000002e,inset 0 1px #ffffff0e;backdrop-filter:none;-webkit-backdrop-filter:none;flex:initial}
 .tool-page .container{max-width:none;padding:28px}
 h1{font-size:30px;font-weight:500;letter-spacing:-.8px;line-height:1.2;text-shadow:none;margin-bottom:10px}
 .subtitle{font-size:14px;line-height:1.6;color:var(--muted);margin:0 0 28px;max-width:850px}
@@ -34,6 +35,7 @@ h2,.card h2{font-size:20px;font-weight:500;letter-spacing:-.4px}
 .file-count{color:var(--muted2);background:#ffffff05;border-color:var(--line);font-size:11px}
 .drop{border-color:#ffffff2b;border-radius:10px;background:#00000018;color:var(--ink);min-height:270px}
 .drop:hover,.drop.dragover{border-color:#3296ff99;background:#3296ff0c}
+.drop.small-drop{min-height:88px}
 .drop>.icon{color:#cfdef0;background:#d8e8ff0a;border-color:var(--glass-edge);border-radius:12px;box-shadow:none}
 .drop b{font-size:14px}.drop span:not(.big){color:var(--muted);font-size:12px}.drop small,.upload-note{color:var(--muted2);font-size:11px}
 .settings-help{border-left-color:#3296ff80;background:#3296ff08;color:var(--muted);font-size:12px}
@@ -71,7 +73,7 @@ select option{background:#171b26}
 .home-signature{position:absolute;bottom:30px;left:40px;color:#e0e9f3aa;font-size:10px;letter-spacing:.15em}
 @media(max-width:1000px){.tool-grid{grid-template-columns:1fr}}
 @media(max-width:760px){
- .tool-page .app-main{width:calc(100% - 24px);margin-bottom:16px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+ .tool-page .app-main{width:calc(100% - 24px);margin-bottom:16px}
  .tool-page .container{padding:20px}.card{padding:18px}
  h1{font-size:29px;letter-spacing:-.6px}.subtitle{font-size:13px}
  .home-hero{padding:240px 22px 120px}

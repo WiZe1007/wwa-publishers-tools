@@ -12,7 +12,8 @@ export function animateEntrance(root, { initial = false } = {}) {
   cancelEntrance();
   if (preference.matches || document.hidden || !root.animate) return;
   const hero = root.querySelector('.home-content');
-  const targets = hero ? [...hero.children] : [root];
+  // Animate the heading, not a several-thousand-pixel release form layer.
+  const targets = hero ? [...hero.children] : [root.querySelector('h1') || root];
   targets.forEach((target, index) => {
     const animation = target.animate([
       { opacity: hero ? .25 : .65, transform: `translateY(${hero ? 12 : 5}px)` },

@@ -14,6 +14,85 @@ export function startBackdrop() {
   let wantsMotion = !pausedByUser && !preference.matches && !restrictedConnection();
   let video;
   let playRequest = 0;
+  let selection;
+  let rendition;
+  let monitor;
+  let badWindows = 0;
+  let stalls = 0;
+  const nextLighter = { ultra: 'desktop', desktop: 'lite' };
+
+  async function selectRendition() {
+    if (matchMedia('(max-width: 760px) and (orientation: portrait)').matches) return 'mobile';
+    const ratio = Math.min(window.devicePixelRatio || 1, 2);
+    const physicalWidth = Math.max(window.innerWidth, window.innerHeight * 16 / 9) * ratio;
+    const downlink = connection?.downlink;
+    const slow = connection?.effectiveType === '3g' || (downlink > 0 && downlink < 6);
+    if (slow || physicalWidth <= 2200) return 'lite';
+    // A Retina screen alone does not imply that 4K can be decoded smoothly.
+    const canCheck = navigator.mediaCapabilities?.decodingInfo;
+    if (!canCheck) return 'desktop';
+    const ultra = physicalWidth > 3072 && (!downlink || downlink >= 15);
+    const candidate = ultra ? 'ultra' : 'desktop';
+    const dimensions = ultra ? [3840, 2160, 12000000, 'avc1.640033'] : [2560, 1440, 8000000, 'avc1.640032'];
+    let timer;
+    try {
+      const capability = await Promise.race([
+        navigator.mediaCapabilities.decodingInfo({ type: 'file', video: {
+          contentType: `video/mp4; codecs="${dimensions[3]}"`,
+          width: dimensions[0], height: dimensions[1], bitrate: dimensions[2], framerate: 30
+        } }),
+        new Promise(resolve => { timer = setTimeout(() => resolve(null), 700); })
+      ]);
+      if (capability?.supported && capability.smooth && capability.powerEfficient) return candidate;
+      return ultra ? 'desktop' : 'lite';
+    } catch {
+      return 'desktop';
+    } finally { clearTimeout(timer); }
+  }
+
+  function stopMonitor() {
+    clearInterval(monitor);
+    monitor = undefined;
+  }
+
+  function useLighterVideo() {
+    const next = nextLighter[rendition];
+    if (!next || !wantsMotion || document.hidden) return false;
+    stopMonitor();
+    ++playRequest;
+    const position = video.currentTime;
+    rendition = next;
+    badWindows = 0;
+    stalls = 0;
+    scene.classList.remove('video-ready');
+    video.dataset.rendition = rendition;
+    video.addEventListener('loadedmetadata', () => {
+      video.currentTime = Math.min(position, Math.max(0, video.duration - .1));
+      play();
+    }, { once: true });
+    video.src = `media/mountains-${rendition}-v3.mp4`;
+    video.load();
+    return true;
+  }
+
+  function startMonitor() {
+    stopMonitor();
+    if (!video.getVideoPlaybackQuality) return;
+    let previous = video.getVideoPlaybackQuality();
+    monitor = setInterval(() => {
+      if (document.hidden || video.paused || !wantsMotion) { stopMonitor(); return; }
+      const quality = video.getVideoPlaybackQuality();
+      const total = quality.totalVideoFrames - previous.totalVideoFrames;
+      const dropped = quality.droppedVideoFrames - previous.droppedVideoFrames;
+      previous = quality;
+      // Read-only diagnostics for real browser verification, updated only every 4s.
+      video.dataset.totalFrames = String(quality.totalVideoFrames);
+      video.dataset.droppedFrames = String(quality.droppedVideoFrames);
+      if (total < 30 || video.seeking) return;
+      badWindows = dropped / total > .04 ? badWindows + 1 : 0;
+      if (badWindows >= 2) useLighterVideo();
+    }, 4000);
+  }
 
   function syncButton() {
     const label = wantsMotion ? 'Призупинити відеофон' : 'Відтворити відеофон';
@@ -27,6 +106,7 @@ export function startBackdrop() {
 
   function pause() {
     ++playRequest;
+    stopMonitor();
     video?.pause();
   }
 
@@ -34,13 +114,9 @@ export function startBackdrop() {
     if (!wantsMotion || document.hidden) return;
     const request = ++playRequest;
     if (!video) {
-      const mobile = matchMedia('(max-width: 760px) and (orientation: portrait)').matches;
-      // Match physical cover resolution, not just CSS width (Retina needs 4K).
-      // Select once: no speculative alternate downloads or navigation restarts.
-      const coverScale = Math.max(window.innerWidth / 1920, window.innerHeight / 1080);
-      const needsUltra = coverScale * Math.min(window.devicePixelRatio || 1, 2) > 1.15;
-      const limitedConnection = connection?.effectiveType === '3g';
-      const rendition = mobile ? 'mobile' : needsUltra && !limitedConnection ? 'ultra' : 'desktop';
+      rendition = await (selection ||= selectRendition());
+      if (request !== playRequest || !wantsMotion || document.hidden) return;
+      const mobile = rendition === 'mobile';
       video = document.createElement('video');
       video.className = 'coastal-video';
       video.muted = true;
@@ -51,24 +127,20 @@ export function startBackdrop() {
       video.disablePictureInPicture = true;
       video.setAttribute('aria-hidden', 'true');
       video.poster = mobile ? 'media/mountains-poster-mobile-v2.jpg' : 'media/mountains-poster-v2.jpg';
-      const standardSource = `media/mountains-${rendition}-v2.mp4`;
-      const efficient4K = rendition === 'ultra' && video.canPlayType('video/mp4; codecs="hvc1.1.6.L153.B0"');
-      video.src = efficient4K ? 'media/mountains-ultra-hevc-v2.mp4' : standardSource;
-      let canFallback = Boolean(efficient4K);
+      video.dataset.rendition = rendition;
+      video.src = `media/mountains-${rendition}-v3.mp4`;
       const reveal = () => scene.classList.add('video-ready');
       video.addEventListener('playing', () => {
         if ('requestVideoFrameCallback' in video) video.requestVideoFrameCallback(reveal);
         else reveal();
+        startMonitor();
+      });
+      video.addEventListener('pause', stopMonitor);
+      video.addEventListener('waiting', () => {
+        if (video.currentTime > 1 && !video.seeking && !document.hidden && wantsMotion && ++stalls >= 2) useLighterVideo();
       });
       video.addEventListener('error', () => {
-        // Some devices advertise HEVC but cannot decode this profile in practice.
-        if (canFallback) {
-          canFallback = false;
-          scene.classList.remove('video-ready');
-          video.src = standardSource;
-          play();
-          return;
-        }
+        if (useLighterVideo()) return;
         pause();
         scene.classList.remove('video-ready');
         wantsMotion = false;

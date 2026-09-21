@@ -514,7 +514,7 @@ $('zipBtn').onclick = async () => {
   if (state.screenshots.length === 0) { st.className = 'status err'; st.textContent = 'Додайте скріншоти.'; return; }
   if (!$('shortDesc').value.trim() || !$('fullDesc').value.trim()) {
     st.className = 'status err';
-    st.textContent = 'Спочатку згенеруйте описи (крок 4) або заповніть їх вручну.';
+    st.textContent = 'Згенеруйте описи в розділі «ASO описи» або заповніть їх вручну.';
     $('asoResults').style.display = '';
     return;
   }
@@ -608,4 +608,3 @@ $('zipBtn').onclick = async () => {
 };
 
 }
-
