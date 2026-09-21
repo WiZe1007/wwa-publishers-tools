@@ -6,7 +6,7 @@
 <meta name="description" content="WWA Tools — робочий простір для підготовки релізів, зміни розміру, конвертації та об’єднання зображень.">
 <meta name="theme-color" content="#090e1b">
 <title>Огляд — WWA Tools</title>
-<link rel="icon" href="img/favicon.png">
+<link rel="icon" href="img/wwa-logo.png">
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/glass.css">
 <link rel="stylesheet" href="css/navigation.css">
@@ -18,15 +18,16 @@
 <a class="skip-link" href="#main">Перейти до вмісту</a>
 <div class="app-shell">
   <header class="workspace-header" id="app-navigation" aria-label="Основна навігація">
-    <a class="brand" href="index.html"><span class="brand-symbol" aria-hidden="true">w<span>·</span></span><span>WWA <b>Tools</b></span></a>
+    <a class="brand" href="index.html"><img src="img/wwa-logo.png" width="30" height="30" alt=""><span>WWA Tools</span></a>
     <nav class="top-nav" id="primary-links">
-      <a href="index.html" class="active" aria-current="page"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>Огляд</span><i class="nav-indicator"></i></a>
-      <a href="zip.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="M3 8v9l9 5 9-5V8M12 13v9M7.5 5.5l9 5"/></svg><span>Release Package</span></a>
-      <a href="resize.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3v14h14M3 7h14v14M3 3l3 3m12 12 3 3"/><path d="M14 3h7v7M21 3l-6 6"/></svg><span>Resize Images</span></a>
-      <a href="convert.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7a8 8 0 0 0-13-3L3 8m0-5v5h5M4 17a8 8 0 0 0 13 3l4-4m0 5v-5h-5"/></svg><span>Convert Images</span></a>
-      <a href="merge.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="18" rx="2"/><rect x="14" y="3" width="7" height="18" rx="2"/></svg><span>Merge Images</span></a>
+      <a href="index.html" class="active" aria-current="page"><span>Огляд</span><i class="nav-indicator"></i></a>
+      <a href="zip.html"><span>Release Package</span></a>
+      <a href="resize.html"><span>Resize</span></a>
+      <a href="convert.html"><span>Convert</span></a>
+      <a href="merge.html"><span>Merge</span></a>
     </nav>
     <button type="button" class="ambient-toggle" aria-pressed="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 11 7-11 7V5Z"/></svg><span>Призупинити відеофон</span></button>
+    <button class="theme-toggle" type="button" aria-label="Увімкнути темну тему" aria-pressed="false" title="Темна тема"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.4 1.4m11.2 11.2L19 19M5 19l1.4-1.4M17.6 6.4 19 5"/></svg></button>
     <button class="menu-button" type="button" aria-label="Відкрити меню" aria-expanded="false" aria-controls="primary-links"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
   </header>
   <div class="app-main">
@@ -34,27 +35,13 @@
       <div class="breadcrumb"><a href="index.html">Workspace</a><span>/</span><span>Огляд</span></div>
       <span class="local-status"><i></i> Локальна обробка</span>
     </header>
-    <main id="main" class="container dashboard">
-      <div class="page-heading"><div><h1>Ваш простір для публікації.</h1><p class="subtitle">Підготуйте реліз та зображення в одному місці.</p></div></div>
-      <div class="overview-grid">
-        <section class="release-feature" aria-labelledby="release-title">
-          <div class="release-copy"><span class="section-label">RELEASE WORKSPACE</span><h2 id="release-title">Готові до наступного релізу?</h2><p>Зберіть метадані, скріншоти та файли додатку в готовий пакет для публікації.</p><a class="btn" href="zip.html">Створити реліз <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></a></div>
-          <div class="file-stack" aria-hidden="true"><div></div><div></div><div><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="M3 8v9l9 5 9-5V8M12 13v9M7.5 5.5l9 5"/></svg><span>RELEASE.zip</span><i></i><i></i><i></i></div></div>
-          <div class="release-foot"><span>Дані додатку</span><i></i><span>ASO описи</span><i></i><span>ZIP експорт</span></div>
-        </section>
-        <section class="workflow-panel" aria-labelledby="workflow-title"><h2 id="workflow-title">Ваш workflow</h2><ol>
-          <li><span>01</span><div><h3>Дані додатку</h3><p>Назва, опис і деталі для сторінки магазину.</p></div></li>
-          <li><span>02</span><div><h3>Скріншоти й файли</h3><p>Візуальні матеріали та збірка додатку.</p></div></li>
-          <li><span>03</span><div><h3>ASO та експорт</h3><p>Підготуйте описи й завантажте готовий ZIP.</p></div></li>
-        </ol></section>
+    <main id="main" class="home-hero">
+      <div class="home-content">
+        <h1>Інструменти для<br>публікації додатків</h1>
+        <p>Підготовка релізів та робота із зображеннями</p>
+        <a class="hero-cta" href="zip.html">Почати роботу <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></a>
       </div>
-      <div class="section-heading"><div><h2>Інструменти для зображень</h2><p>Від вихідного файлу до потрібного результату.</p></div><span>03 інструменти</span></div>
-      <div class="tool-cards">
-        <a class="tool-card" href="resize.html"><span class="tool-icon resize"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3v14h14M3 7h14v14M3 3l3 3m12 12 3 3"/><path d="M14 3h7v7M21 3l-6 6"/></svg></span><h3>Resize Images</h3><p>Точні розміри для кожного формату. Одне зображення або ціла добірка.</p><small>PNG · JPEG · WebP</small><span class="tool-card-footer">Відкрити інструмент <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></span></a>
-        <a class="tool-card" href="convert.html"><span class="tool-icon convert"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7a8 8 0 0 0-13-3L3 8m0-5v5h5M4 17a8 8 0 0 0 13 3l4-4m0 5v-5h-5"/></svg></span><h3>Convert Images</h3><p>Потрібний формат без зайвих кроків. Керуйте якістю й експортуйте пакетом.</p><small>PNG · JPEG · WebP · BMP</small><span class="tool-card-footer">Відкрити інструмент <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></span></a>
-        <a class="tool-card" href="merge.html"><span class="tool-icon merge"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="18" rx="2"/><rect x="14" y="3" width="7" height="18" rx="2"/></svg></span><h3>Merge Images</h3><p>Поєднайте зображення в одну композицію. Горизонтально, вертикально або сіткою.</p><small>Рядок · Колонка · Сітка</small><span class="tool-card-footer">Відкрити інструмент <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></span></a>
-      </div>
-      <div class="privacy-strip"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3Z"/><path d="m8 12 3 3 5-6"/></svg><p><b>Приватність за замовчуванням.</b> Зображення обробляються у браузері. Для ASO назва, опис і скріншоти надсилаються до AI лише після натискання «Згенерувати».</p></div>
+      <span class="home-signature" aria-hidden="true">WWA TOOLS</span>
     </main>
     <footer class="app-footer"><span>Створено для щоденної роботи.</span><span>WWA Tools <i>•</i> Publishing workspace</span></footer>
   </div>
