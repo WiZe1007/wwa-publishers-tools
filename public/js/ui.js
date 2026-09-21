@@ -3,6 +3,21 @@
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   let interactivePanels = [];
 
+  function mountBackdrop() {
+    if (!document.body.classList.contains('tool-page') || document.querySelector('.tool-bg-video')) return;
+    const video = document.createElement('video');
+    video.className = 'tool-bg-video';
+    video.autoplay = true;
+    video.muted = true;
+    video.loop = true;
+    video.playsInline = true;
+    video.preload = 'auto';
+    video.setAttribute('aria-hidden', 'true');
+    video.src = 'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260826_124724_bc041163-d651-425f-aea3-2acc1efc2c96.mp4';
+    document.body.prepend(video);
+    if (reduceMotion) video.pause();
+  }
+
   function collectPanels() {
     interactivePanels = [...document.querySelectorAll('.card, .tile')];
   }
@@ -27,6 +42,7 @@
   }
 
   function start() {
+    mountBackdrop();
     document.body.classList.add('page-loaded');
     collectPanels();
     revealPanels();
