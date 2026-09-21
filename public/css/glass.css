@@ -1,4 +1,4 @@
-/* Liquid glass material. Layout lives in style.css; only the parent shell blurs. */
+/* Liquid glass material. Top-navigation compositing is configured in navigation.css. */
 :root{--ink:#f4f7fb;--muted:#d1dbe5;--muted2:#b9c8d6;--line:rgba(236,246,255,.23);--accent:#d1e0ff;--blue:#8cb8ff;--radius:20px}
 html{background:#15202a}
 body{position:relative;isolation:isolate;background:transparent;padding:28px;min-height:100svh}

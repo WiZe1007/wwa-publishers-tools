@@ -1,0 +1,40 @@
+/* Persistent top navigation. Only the header blurs the moving video. */
+.app-shell{display:flex;flex-direction:column;overflow:visible;backdrop-filter:none;-webkit-backdrop-filter:none}
+.app-main{flex:1;backdrop-filter:none;-webkit-backdrop-filter:none}
+.workspace-header{position:sticky;top:16px;z-index:60;display:flex;align-items:center;gap:24px;min-height:82px;margin:12px 12px 0;padding:14px 20px;border:1px solid #e4f2ff40;border-radius:20px;background:linear-gradient(120deg,#d3e6fb18,#081b2b80);backdrop-filter:blur(12px) saturate(115%);-webkit-backdrop-filter:blur(12px) saturate(115%);box-shadow:inset 0 1px #fff4,0 8px 24px #00101b12}
+.workspace-header .brand{padding:0;gap:10px;font-size:20px}
+.top-nav{display:flex;align-items:center;justify-content:center;gap:5px;margin:auto}
+.top-nav a{display:flex;align-items:center;gap:9px;min-height:43px;padding:10px 14px;border:1px solid transparent;border-radius:11px;color:#e1eaf5;font-size:12px;white-space:nowrap;transition:background .15s,border-color .15s}
+.top-nav a .icon{width:17px;height:17px}
+.top-nav a:hover{background:#e5f3ff17}
+.top-nav a.active{color:white;background:linear-gradient(125deg,#e9f4ff2e,#bfdfff13);border-color:#e5f5ff5e;box-shadow:inset 0 1px #fff4}
+.top-nav .nav-indicator{display:none}
+.workspace-header .ambient-toggle{width:42px;height:42px;flex:none;justify-content:center;padding:0;position:relative}
+.ambient-toggle span,.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.workspace-header .menu-button{display:none;flex:none}
+.topbar{height:54px;border-bottom:0}
+.container{padding-top:16px}
+.dashboard{max-width:1320px}
+.container h1:focus{outline:none}
+.overview-grid{grid-template-columns:minmax(0,1.7fr) minmax(300px,1fr)}
+.tool-grid{grid-template-columns:minmax(0,1.12fr) minmax(0,1fr)}
+@media(min-width:1450px){.container{padding-top:20px}}
+@media(max-width:1200px){.workspace-header{gap:12px;padding:12px 16px}.top-nav a{padding:9px 10px;font-size:11px}.workspace-header .brand{font-size:18px}}
+@media(max-width:1000px){
+ .workspace-header{flex-wrap:wrap;gap:12px;min-height:70px;top:10px;margin:10px 10px 0;padding:12px 14px;border-radius:17px}
+ .workspace-header .brand{margin-right:auto}.workspace-header .menu-button{display:flex;width:42px;height:42px}
+ .top-nav{display:none;order:4;flex-basis:100%;margin:0;padding-top:10px;border-top:1px solid #e2f0ff2b}
+ .nav-open .top-nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+ .top-nav a{font-size:12px;padding:12px}.top-nav a.active{border-color:#eff7ff65}
+ .overview-grid,.tool-grid{grid-template-columns:1fr}
+}
+@media(max-width:760px){
+ .workspace-header{top:10px;margin:7px 7px 0;padding:10px;gap:8px;min-height:65px}
+ .workspace-header .brand{font-size:17px;gap:8px}.brand-symbol{width:29px;height:29px;font-size:23px}
+ .workspace-header .ambient-toggle,.workspace-header .menu-button{width:37px;height:37px}
+ .nav-open .top-nav{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .top-nav a{font-size:11px;gap:8px;padding:10px 8px;min-height:43px}
+ .top-nav a:last-child{grid-column:1 / -1}
+ .topbar{height:44px}.container{padding-top:16px}
+}
+@media(prefers-reduced-motion:reduce){.top-nav a{transition:none}}

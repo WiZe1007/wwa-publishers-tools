@@ -9,31 +9,28 @@
 <link rel="icon" href="img/favicon.png">
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/glass.css">
-<script src="js/ui.js" defer></script>
+<link rel="stylesheet" href="css/navigation.css">
+<script src="js/vendor/jszip.min.js" defer></script>
+<script src="js/lightbox.js" defer></script>
+<script type="module" src="js/ui.js"></script>
 </head>
 <body class="home-page">
 <a class="skip-link" href="#main">Перейти до вмісту</a>
 <div class="app-shell">
-  <aside class="sidebar" id="app-navigation" aria-label="Основна навігація">
+  <header class="workspace-header" id="app-navigation" aria-label="Основна навігація">
     <a class="brand" href="index.html"><span class="brand-symbol" aria-hidden="true">w<span>·</span></span><span>WWA <b>Tools</b></span></a>
-    <p class="nav-label">WORKSPACE</p>
-    <nav class="side-nav">
+    <nav class="top-nav" id="primary-links">
       <a href="index.html" class="active" aria-current="page"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>Огляд</span><i class="nav-indicator"></i></a>
       <a href="zip.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="M3 8v9l9 5 9-5V8M12 13v9M7.5 5.5l9 5"/></svg><span>Release Package</span></a>
       <a href="resize.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3v14h14M3 7h14v14M3 3l3 3m12 12 3 3"/><path d="M14 3h7v7M21 3l-6 6"/></svg><span>Resize Images</span></a>
       <a href="convert.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7a8 8 0 0 0-13-3L3 8m0-5v5h5M4 17a8 8 0 0 0 13 3l4-4m0 5v-5h-5"/></svg><span>Convert Images</span></a>
       <a href="merge.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="18" rx="2"/><rect x="14" y="3" width="7" height="18" rx="2"/></svg><span>Merge Images</span></a>
     </nav>
-    <div class="sidebar-bottom">
-      <button type="button" class="ambient-toggle" aria-pressed="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 11 7-11 7V5Z"/></svg><span>Призупинити відеофон</span></button>
-      <div class="sidebar-note"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3Z"/><path d="m8 12 3 3 5-6"/></svg><div><b>Ваші файли — у вас</b><p>Обробка зображень локально, без завантаження на сервер.</p></div></div>
-      <span class="sidebar-caption">WWA Publishers Tools</span>
-    </div>
-  </aside>
-  <button class="nav-backdrop" type="button" aria-label="Закрити меню" tabindex="-1" hidden></button>
+    <button type="button" class="ambient-toggle" aria-pressed="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 11 7-11 7V5Z"/></svg><span>Призупинити відеофон</span></button>
+    <button class="menu-button" type="button" aria-label="Відкрити меню" aria-expanded="false" aria-controls="primary-links"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+  </header>
   <div class="app-main">
     <header class="topbar">
-      <button class="menu-button" type="button" aria-label="Відкрити меню" aria-expanded="false" aria-controls="app-navigation"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
       <div class="breadcrumb"><a href="index.html">Workspace</a><span>/</span><span>Огляд</span></div>
       <span class="local-status"><i></i> Локальна обробка</span>
     </header>

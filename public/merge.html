@@ -7,33 +7,29 @@
 <link rel="icon" type="image/png" href="img/favicon.png">
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/glass.css">
+<link rel="stylesheet" href="css/navigation.css">
 <script src="js/lightbox.js" defer></script>
-<script src="js/ui.js" defer></script>
+<script src="js/vendor/jszip.min.js" defer></script>
+<script type="module" src="js/ui.js"></script>
 
 </head>
 <body class="tool-page merge-page">
 <a class="skip-link" href="#main">Перейти до вмісту</a>
 <div class="app-shell">
-  <aside class="sidebar" id="app-navigation" aria-label="Основна навігація">
+  <header class="workspace-header" id="app-navigation" aria-label="Основна навігація">
     <a class="brand" href="index.html"><span class="brand-symbol" aria-hidden="true">w<span>·</span></span><span>WWA <b>Tools</b></span></a>
-    <p class="nav-label">WORKSPACE</p>
-    <nav class="side-nav">
+    <nav class="top-nav" id="primary-links">
       <a href="index.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>Огляд</span></a>
       <a href="zip.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="M3 8v9l9 5 9-5V8M12 13v9M7.5 5.5l9 5"/></svg><span>Release Package</span></a>
       <a href="resize.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3v14h14M3 7h14v14M3 3l3 3m12 12 3 3"/><path d="M14 3h7v7M21 3l-6 6"/></svg><span>Resize Images</span></a>
       <a href="convert.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7a8 8 0 0 0-13-3L3 8m0-5v5h5M4 17a8 8 0 0 0 13 3l4-4m0 5v-5h-5"/></svg><span>Convert Images</span></a>
       <a href="merge.html" class="active" aria-current="page"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="18" rx="2"/><rect x="14" y="3" width="7" height="18" rx="2"/></svg><span>Merge Images</span><i class="nav-indicator"></i></a>
     </nav>
-    <div class="sidebar-bottom">
-      <button type="button" class="ambient-toggle" aria-pressed="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 11 7-11 7V5Z"/></svg><span>Призупинити відеофон</span></button>
-      <div class="sidebar-note"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3Z"/><path d="m8 12 3 3 5-6"/></svg><div><b>Ваші файли — у вас</b><p>Обробка зображень локально, без завантаження на сервер.</p></div></div>
-      <span class="sidebar-caption">WWA Publishers Tools</span>
-    </div>
-  </aside>
-  <button class="nav-backdrop" type="button" aria-label="Закрити меню" tabindex="-1" hidden></button>
+    <button type="button" class="ambient-toggle" aria-pressed="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 11 7-11 7V5Z"/></svg><span>Призупинити відеофон</span></button>
+    <button class="menu-button" type="button" aria-label="Відкрити меню" aria-expanded="false" aria-controls="primary-links"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+  </header>
   <div class="app-main">
     <header class="topbar">
-      <button class="menu-button" type="button" aria-label="Відкрити меню" aria-expanded="false" aria-controls="app-navigation"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
       <div class="breadcrumb"><a href="index.html">Workspace</a><span>/</span><span>Merge Images</span></div>
       <span class="local-status"><i></i> Локальна обробка</span>
     </header>
@@ -110,146 +106,6 @@
 </div>
 </div>
 
-<script>
-const $ = id => document.getElementById(id);
-let items = []; // {file, url, img}
 
-const drop = $('drop'), input = $('input');
-drop.onclick = () => input.click();
-input.onchange = () => { addFiles([...input.files]); input.value = ''; };
-;['dragover','dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => {
-  e.preventDefault();
-  drop.classList.toggle('dragover', ev === 'dragover');
-  if (ev === 'drop') addFiles([...e.dataTransfer.files].filter(f => f.type.startsWith('image/')));
-}));
-
-async function addFiles(list) {
-  for (const f of list) {
-    const url = URL.createObjectURL(f);
-    const img = await new Promise((res, rej) => {
-      const i = new Image();
-      i.onload = () => res(i);
-      i.onerror = () => rej();
-      i.src = url;
-    }).catch(() => null);
-    if (img) items.push({ file: f, url, img });
-  }
-  render();
-}
-
-function render() {
-  const box = $('thumbs');
-  box.innerHTML = '';
-  items.forEach((it, i) => {
-    const d = document.createElement('div');
-    d.className = 'thumb';
-    d.innerHTML = `<img src="${it.url}"><span class="num">${i + 1}</span><span class="x">✕</span>
-      <div style="position:absolute;bottom:2px;left:2px;right:2px;display:flex;justify-content:space-between">
-        <button class="mv" data-d="-1" style="background:rgba(0,0,0,.65);color:#fff;border:none;border-radius:5px;cursor:pointer;padding:0 6px">←</button>
-        <button class="mv" data-d="1" style="background:rgba(0,0,0,.65);color:#fff;border:none;border-radius:5px;cursor:pointer;padding:0 6px">→</button>
-      </div>`;
-    d.querySelector('img').onclick = () => openLightbox(it.url);
-    d.querySelector('.x').onclick = () => { URL.revokeObjectURL(it.url); items.splice(i, 1); render(); };
-    d.querySelectorAll('.mv').forEach(b => b.onclick = () => {
-      const j = i + Number(b.dataset.d);
-      if (j < 0 || j >= items.length) return;
-      [items[i], items[j]] = [items[j], items[i]];
-      render();
-    });
-    box.appendChild(d);
-  });
-  $('controlFields').disabled = items.length < 2;
-}
-
-$('direction').onchange = () => {
-  $('colsWrap').style.display = $('direction').value === 'grid' ? '' : 'none';
-};
-$('colsWrap').style.display = 'none';
-
-$('format').onchange = () => {
-  if ($('format').value !== 'image/png') $('transparent').checked = false;
-};
-
-function compose() {
-  const dir = $('direction').value;
-  const gap = Math.max(0, parseInt($('gap').value) || 0);
-  const unify = $('fitMode').value === 'unify';
-  const cols = dir === 'grid' ? Math.max(1, parseInt($('cols').value) || 2) : (dir === 'horizontal' ? items.length : 1);
-  const transparent = $('transparent').checked && $('format').value === 'image/png';
-
-  // Determine cell sizes
-  let sizes = items.map(it => ({ w: it.img.width, h: it.img.height }));
-  if (unify) {
-    if (dir === 'horizontal') {
-      const h = Math.min(...sizes.map(s => s.h));
-      sizes = items.map(it => ({ w: Math.round(it.img.width * h / it.img.height), h }));
-    } else if (dir === 'vertical') {
-      const w = Math.min(...sizes.map(s => s.w));
-      sizes = items.map(it => ({ w, h: Math.round(it.img.height * w / it.img.width) }));
-    } else {
-      // grid: спільна ширина клітинки = мінімальна ширина, висота — пропорційно кожному зображенню
-      const w = Math.min(...sizes.map(s => s.w));
-      sizes = items.map(it => ({ w, h: Math.round(it.img.height * w / it.img.width) }));
-    }
-  }
-
-  const rows = Math.ceil(items.length / cols);
-  let colW = [], rowH = [];
-  for (let i = 0; i < items.length; i++) {
-    const c = i % cols, r = Math.floor(i / cols);
-    colW[c] = Math.max(colW[c] || 0, sizes[i].w);
-    rowH[r] = Math.max(rowH[r] || 0, sizes[i].h);
-  }
-  const W = colW.reduce((a, b) => a + b, 0) + gap * (colW.length - 1);
-  const H = rowH.reduce((a, b) => a + b, 0) + gap * (rowH.length - 1);
-
-  const canvas = $('canvas');
-  canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext('2d');
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  if (!transparent) { ctx.fillStyle = $('bgColor').value; ctx.fillRect(0, 0, W, H); }
-  else ctx.clearRect(0, 0, W, H);
-
-  for (let i = 0; i < items.length; i++) {
-    const c = i % cols, r = Math.floor(i / cols);
-    let x = 0, y = 0;
-    for (let k = 0; k < c; k++) x += colW[k] + gap;
-    for (let k = 0; k < r; k++) y += rowH[k] + gap;
-    // center in cell
-    x += Math.round((colW[c] - sizes[i].w) / 2);
-    y += Math.round((rowH[r] - sizes[i].h) / 2);
-    ctx.drawImage(items[i].img, x, y, sizes[i].w, sizes[i].h);
-  }
-  return canvas;
-}
-
-$('previewBtn').onclick = () => {
-  if (items.length < 2) return;
-  compose();
-  $('previewBox').style.display = '';
-  $('status').className = 'status';
-  $('status').textContent = `Розмір результату: ${$('canvas').width} × ${$('canvas').height} px`;
-};
-
-$('mergeBtn').onclick = () => {
-  const st = $('status');
-  if (items.length < 2) { st.className = 'status err'; st.textContent = 'Додайте мінімум 2 зображення.'; return; }
-  const canvas = compose();
-  $('previewBox').style.display = '';
-  const type = $('format').value;
-  const ext = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' }[type];
-  canvas.toBlob(blob => {
-    if (!blob) { st.className = 'status err'; st.textContent = 'Помилка створення зображення.'; return; }
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `merged.${ext}`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-    st.className = 'status ok';
-    st.textContent = `✓ Готово: merged.${ext} (${canvas.width} × ${canvas.height} px)`;
-  }, type, 0.95);
-};
-</script>
 </body>
 </html>
