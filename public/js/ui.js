@@ -11,11 +11,19 @@
     video.muted = true;
     video.loop = true;
     video.playsInline = true;
-    video.preload = 'auto';
+    video.preload = 'metadata';
     video.setAttribute('aria-hidden', 'true');
-    video.src = 'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260826_124724_bc041163-d651-425f-aea3-2acc1efc2c96.mp4';
+    video.poster = 'media/coast-poster.jpg';
+    const mobile = document.createElement('source');
+    mobile.media = '(max-width: 700px)';
+    mobile.type = 'video/mp4';
+    mobile.src = 'media/coast-mobile.mp4';
+    const desktop = document.createElement('source');
+    desktop.type = 'video/mp4';
+    desktop.src = 'media/coast-desktop.mp4';
+    video.append(mobile, desktop);
     document.body.prepend(video);
-    if (reduceMotion) video.pause();
+    if (reduceMotion) video.remove();
   }
 
   function collectPanels() {
