@@ -12,8 +12,9 @@
 html{background:#101e32}
 body{position:relative;isolation:isolate;margin:0;padding:0;min-height:100svh;background:transparent;font-family:var(--font);overflow-x:clip}
 body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(180deg,#0c1a364d,#13244326 30%,#11234042 70%,#08132199)}
-.coastal-scene{position:fixed;inset:0;z-index:-2;pointer-events:none;background:#102034 url('../media/coast-poster.jpg') center/cover no-repeat}
-.coastal-video{display:block;width:100%;height:100%;object-fit:cover}
+.coastal-scene{position:fixed;inset:0;z-index:-2;pointer-events:none;overflow:hidden;background:#102034 url('../media/mountains-poster-v1.jpg') center/cover no-repeat}
+.coastal-video{display:block;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .5s ease}
+.video-ready .coastal-video{opacity:1}
 .tool-page::before{background:linear-gradient(110deg,#09162b9e,#0a1325c9)}
 html[data-theme=dark]{--glass-shell:linear-gradient(145deg,rgba(143,154,174,.13),rgba(22,26,36,.22) 50%,rgba(1,3,8,.64));--glass-inner:linear-gradient(125deg,rgba(255,255,255,.022),rgba(0,0,0,.26));--glass-edge:rgba(255,255,255,.10);--field:rgba(0,0,0,.32)}
 html[data-theme=dark] body::before{background:linear-gradient(180deg,#0c1a367d,#13244366 30%,#11234072 70%,#081321bc)}
@@ -70,7 +71,7 @@ select option{background:#171b26}
 .home-signature{position:absolute;bottom:30px;left:40px;color:#e0e9f3aa;font-size:10px;letter-spacing:.15em}
 @media(max-width:1000px){.tool-grid{grid-template-columns:1fr}}
 @media(max-width:760px){
- .coastal-scene{background-image:url('../media/coast-poster-mobile.jpg')}
+ .coastal-scene{background-image:url('../media/mountains-poster-mobile-v1.jpg')}
  .tool-page .app-main{width:calc(100% - 24px);margin-bottom:16px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
  .tool-page .container{padding:20px}.card{padding:18px}
  h1{font-size:29px;letter-spacing:-.6px}.subtitle{font-size:13px}
@@ -85,3 +86,14 @@ select option{background:#171b26}
 @media(max-width:540px){.tool-page .container{padding:18px 12px}h1{font-size:27px}.card h2{font-size:18px}.drop{min-height:220px}}
 @media(max-width:360px){.home-content h1{font-size:32px}}
 @media(prefers-reduced-motion:reduce){.hero-cta{transition:none}}
+
+/* Motion changes only opacity/transform; glass blur itself is never animated. */
+@media(prefers-reduced-motion:no-preference){
+ .hero-cta,.btn,.tone,.workspace-header .ambient-toggle,.workspace-header .theme-toggle{transition:transform .18s cubic-bezier(.22,1,.36,1),background-color .18s,border-color .18s}
+ .hero-cta .icon{transition:transform .22s cubic-bezier(.22,1,.36,1)}
+ .hero-cta:hover .icon{transform:translateX(3px)}
+ .hero-cta:active,.btn:active:not(:disabled),.workspace-header .ambient-toggle:active,.workspace-header .theme-toggle:active{transform:scale(.97)}
+ .top-nav a.active{animation:nav-settle .2s ease-out}
+ @media(hover:hover){.hero-cta:hover,.btn:hover:not(:disabled){transform:translateY(-2px)}}
+}
+@keyframes nav-settle{from{opacity:.65}to{opacity:1}}

@@ -21,7 +21,14 @@ const API_KEY = process.env.ANTHROPIC_API_KEY || '';
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5';
 
 app.use(express.json({ limit: '80mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders(res, filePath) {
+    // Versioned background files are safe to retain across visits and deploys.
+    if (/mountains-[a-z-]+-v\d+\.(mp4|jpg)$/.test(path.basename(filePath))) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    }
+  }
+}));
 
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, aiConfigured: Boolean(API_KEY) });

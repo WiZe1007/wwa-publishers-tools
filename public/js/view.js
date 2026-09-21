@@ -1,3 +1,5 @@
+import { animateEntrance } from './motion.js';
+
 export function initView(root, route) {
   const get = id => root.querySelector('#' + CSS.escape(id));
     root.querySelectorAll('.drop').forEach(drop => {
@@ -62,6 +64,7 @@ export function initView(root, route) {
       actions.innerHTML = '<span class="step-counter"></span><div><button type="button" class="btn secondary" id="previousStep">Назад</button><button type="button" class="btn" id="nextStep">Далі →</button></div>';
       let current = 0;
       function select(index, focus = false) {
+        const previous = current;
         current = Math.max(0, Math.min(panels.length - 1, index));
         panels.forEach((panel, i) => {
           panel.hidden = i !== current;
@@ -72,6 +75,7 @@ export function initView(root, route) {
         actions.querySelector('.step-counter').textContent = 'Крок ' + (current + 1) + ' із ' + panels.length;
         actions.querySelector('#previousStep').disabled = current === 0;
         actions.querySelector('#nextStep').hidden = current === panels.length - 1;
+        if (previous !== current && root.isConnected) animateEntrance(panels[current]);
         if (focus) { tabs.children[current].focus(); tabs.children[current].scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
       }
       panels.forEach((panel, index) => {
@@ -101,4 +105,3 @@ export function initView(root, route) {
       select(0);
     }
 }
-

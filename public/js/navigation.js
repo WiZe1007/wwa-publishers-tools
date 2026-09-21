@@ -1,4 +1,5 @@
 import { initView } from './view.js';
+import { animateEntrance, cancelEntrance } from './motion.js';
 
 const loaders = {
   zip: () => import('./tools/zip.js'),
@@ -10,9 +11,7 @@ const routes = new Set(['index', ...Object.keys(loaders)]);
 
 export async function startNavigation(closeMenu) {
   const cache = new Map();
-  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   let sequence = 0;
-  let animation;
   const routeFor = url => {
     if (url.origin !== location.origin || url.hash) return null;
     const match = url.pathname.match(/^\/(index|zip|resize|convert|merge)\.html$/);
@@ -33,6 +32,7 @@ export async function startNavigation(closeMenu) {
   let current = entryFrom(document, routeFor(new URL(location.href)) || 'index');
   cache.set(current.route, initialize(current));
   await cache.get(current.route);
+  animateEntrance(current.root, { initial: true });
   history.scrollRestoration = 'manual';
 
   const announcement = document.createElement('div');
@@ -66,7 +66,7 @@ export async function startNavigation(closeMenu) {
       const next = await load(route);
       if (request !== sequence) return;
       current.scroll = window.scrollY;
-      animation?.cancel();
+      cancelEntrance();
       current.root.replaceWith(next.root);
       current = next;
       document.title = next.title;
@@ -84,12 +84,7 @@ export async function startNavigation(closeMenu) {
       const heading = next.root.querySelector('h1');
       heading.tabIndex = -1;
       heading.focus({ preventScroll: true });
-      if (!reducedMotion.matches) {
-        animation = next.root.animate([
-          { opacity: .78, transform: 'translateY(5px)' },
-          { opacity: 1, transform: 'translateY(0)' }
-        ], { duration: 160, easing: 'ease-out' });
-      }
+      animateEntrance(next.root);
       announcement.textContent = next.breadcrumb;
     } catch {
       // Direct URLs remain functional if fetching or module loading fails.
