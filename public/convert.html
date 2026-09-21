@@ -6,49 +6,57 @@
 <title>Convert Images — WWA Publishers Tools</title>
 <link rel="icon" type="image/png" href="img/favicon.png">
 <link rel="stylesheet" href="css/style.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="js/lightbox.js"></script>
-<script src="js/ui.js"></script>
-<script src="js/nav.js" defer></script>
-</head>
-<body class="tool-page">
-<nav>
-  <a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true"><i></i></span>WWA <span>Tools</span></a>
-  <div class="nav-links">
-    <a class="link" href="zip.html">ZIP Creating</a>
-    <a class="link" href="resize.html">Resize</a>
-    <a class="link active" href="convert.html">Convert</a>
-    <a class="link" href="merge.html">Merge</a>
-  </div>
-  <a class="pill" href="index.html">Home</a>
-  <button class="burger" type="button" aria-label="Меню" aria-expanded="false" aria-controls="mobile-menu">
-    <span></span><span></span><span></span>
-  </button>
-</nav>
-<div class="menu-backdrop" id="menu-backdrop"></div>
-<div class="mobile-menu" id="mobile-menu">
-    <a class="link" href="zip.html">ZIP Creating</a>
-    <a class="link" href="resize.html">Resize</a>
-    <a class="link active" href="convert.html">Convert</a>
-    <a class="link" href="merge.html">Merge</a>
-  <a class="pill" href="index.html">Home</a>
-</div>
+<link rel="stylesheet" href="css/glass.css">
+<script src="js/vendor/jszip.min.js" defer></script>
+<script src="js/lightbox.js" defer></script>
+<script src="js/ui.js" defer></script>
 
-<div class="container">
-  <p class="page-kicker">Workspace / Image utility</p>
+</head>
+<body class="tool-page convert-page">
+<a class="skip-link" href="#main">Перейти до вмісту</a>
+<div class="app-shell">
+  <aside class="sidebar" id="app-navigation" aria-label="Основна навігація">
+    <a class="brand" href="index.html"><span class="brand-symbol" aria-hidden="true">w<span>·</span></span><span>WWA <b>Tools</b></span></a>
+    <p class="nav-label">WORKSPACE</p>
+    <nav class="side-nav">
+      <a href="index.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>Огляд</span></a>
+      <a href="zip.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="M3 8v9l9 5 9-5V8M12 13v9M7.5 5.5l9 5"/></svg><span>Release Package</span></a>
+      <a href="resize.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3v14h14M3 7h14v14M3 3l3 3m12 12 3 3"/><path d="M14 3h7v7M21 3l-6 6"/></svg><span>Resize Images</span></a>
+      <a href="convert.html" class="active" aria-current="page"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7a8 8 0 0 0-13-3L3 8m0-5v5h5M4 17a8 8 0 0 0 13 3l4-4m0 5v-5h-5"/></svg><span>Convert Images</span><i class="nav-indicator"></i></a>
+      <a href="merge.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="18" rx="2"/><rect x="14" y="3" width="7" height="18" rx="2"/></svg><span>Merge Images</span></a>
+    </nav>
+    <div class="sidebar-bottom">
+      <button type="button" class="ambient-toggle" aria-pressed="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 11 7-11 7V5Z"/></svg><span>Призупинити відеофон</span></button>
+      <div class="sidebar-note"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3Z"/><path d="m8 12 3 3 5-6"/></svg><div><b>Ваші файли — у вас</b><p>Обробка зображень локально, без завантаження на сервер.</p></div></div>
+      <span class="sidebar-caption">WWA Publishers Tools</span>
+    </div>
+  </aside>
+  <button class="nav-backdrop" type="button" aria-label="Закрити меню" tabindex="-1" hidden></button>
+  <div class="app-main">
+    <header class="topbar">
+      <button class="menu-button" type="button" aria-label="Відкрити меню" aria-expanded="false" aria-controls="app-navigation"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+      <div class="breadcrumb"><a href="index.html">Workspace</a><span>/</span><span>Convert Images</span></div>
+      <span class="local-status"><i></i> Локальна обробка</span>
+    </header>
+<main id="main" class="container">
   <h1>Convert Images</h1>
   <p class="subtitle">Конвертуйте PNG, JPEG, WebP, BMP, GIF, AVIF та ICO — по одному або пакетно, безпосередньо у браузері.</p>
 
-  <div class="card">
-    <div class="drop" id="drop">
-      <span class="big">🖼️</span>
-      Перетягніть зображення сюди або натисніть, щоб обрати (можна декілька)
+  <div class="tool-grid">
+  <section class="card upload-panel">
+    <div class="panel-heading"><h2>Вихідні зображення</h2><span class="file-count" aria-live="polite">0 файлів</span></div>
+    <div class="drop" id="drop" role="button" tabindex="0" aria-label="Обрати зображення">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V3m-5 5 5-5 5 5M4 15v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/></svg>
+      <b>Перетягніть зображення сюди</b><span>або натисніть, щоб обрати файли</span><small>PNG, JPEG, WebP та інші формати</small>
     </div>
     <input type="file" id="input" accept="image/*,.ico,.bmp,.avif" multiple hidden>
     <div class="thumbs" id="thumbs"></div>
-  </div>
+    <p class="upload-note">Файли залишаються у вашому браузері</p>
+  </section>
 
-  <div class="card" id="controls" style="display:none">
+  <section class="card settings-panel" id="controls">
+    <p class="settings-help">Додайте зображення, щоб розпочати.</p>
+    <fieldset id="controlFields" disabled>
     <h2>Налаштування</h2>
     <div class="row">
       <label class="fld" style="margin:0"><b>Конвертувати в</b>
@@ -70,7 +78,12 @@
       <span class="status" id="status" style="margin:0"></span>
     </div>
     <div class="filelist" id="results"></div>
+    </fieldset>
+  </section>
   </div>
+</main>
+<footer class="app-footer"><span>Зображення обробляються на вашому пристрої.</span><span>WWA Tools <i>•</i> Publishing workspace</span></footer>
+</div>
 </div>
 
 <script>
@@ -90,7 +103,7 @@ input.onchange = () => { addFiles([...input.files]); input.value = ''; };
 function addFiles(list) {
   for (const f of list) files.push({ file: f, url: URL.createObjectURL(f) });
   render();
-  $('controls').style.display = files.length ? '' : 'none';
+  $('controlFields').disabled = !files.length;
 }
 
 function render() {
@@ -102,7 +115,7 @@ function render() {
     d.innerHTML = `<img src="${f.url}" onerror="this.style.display='none'"><span class="size">${f.file.name}</span><span class="x">✕</span>`;
     d.title = f.file.name;
     d.querySelector('img').onclick = () => openLightbox(f.url);
-    d.querySelector('.x').onclick = () => { URL.revokeObjectURL(f.url); files.splice(i, 1); render(); $('controls').style.display = files.length ? '' : 'none'; };
+    d.querySelector('.x').onclick = () => { URL.revokeObjectURL(f.url); files.splice(i, 1); render(); $('controlFields').disabled = !files.length; };
     box.appendChild(d);
   });
 }
@@ -208,13 +221,27 @@ $('convertBtn').onclick = async () => {
 };
 
 $('zipBtn').onclick = async () => {
-  const zip = new JSZip();
-  for (const c of converted) zip.file(c.name, c.blob);
-  const blob = await zip.generateAsync({ type: 'blob' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'converted_images.zip';
-  a.click();
+  const button = $('zipBtn');
+  button.disabled = true;
+  $('status').className = 'status';
+  $('status').textContent = 'Пакую файли в ZIP…';
+  try {
+    const zip = new JSZip();
+    for (const c of converted) zip.file(c.name, c.blob);
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'converted_images.zip';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+    $('status').className = 'status ok';
+    $('status').textContent = 'Архів готовий: converted_images.zip';
+  } catch (error) {
+    $('status').className = 'status err';
+    $('status').textContent = 'Не вдалося створити ZIP. Спробуйте ще раз.';
+  } finally {
+    button.disabled = false;
+  }
 };
 </script>
 </body>

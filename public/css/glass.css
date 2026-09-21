@@ -1,0 +1,97 @@
+/* Liquid glass material. Layout lives in style.css; only the parent shell blurs. */
+:root{--ink:#f4f7fb;--muted:#d1dbe5;--muted2:#b9c8d6;--line:rgba(236,246,255,.23);--accent:#d1e0ff;--blue:#8cb8ff;--radius:20px}
+html{background:#15202a}
+body{position:relative;isolation:isolate;background:transparent;padding:28px;min-height:100svh}
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(120deg,rgba(3,12,23,.52),rgba(8,17,29,.43) 65%,rgba(5,13,21,.46))}
+.coastal-scene{position:fixed;inset:0;z-index:-2;pointer-events:none;background:#3c525b url('../media/coast-poster.jpg') center/cover no-repeat}
+.coastal-video{display:block;width:100%;height:100%;object-fit:cover}
+.app-shell{min-height:calc(100svh - 56px);border:1px solid rgba(231,245,255,.42);border-radius:28px;background:linear-gradient(125deg,rgba(216,232,255,.12),rgba(7,19,30,.28) 43%,rgba(207,229,248,.08));backdrop-filter:blur(3px) saturate(115%);-webkit-backdrop-filter:blur(3px) saturate(115%);box-shadow:inset 0 1px 0 rgba(255,255,255,.42),inset 1px 0 0 rgba(255,255,255,.13),0 24px 70px rgba(1,7,16,.24)}
+.sidebar{height:calc(100svh - 58px);border-color:rgba(226,241,255,.2);background:linear-gradient(155deg,rgba(189,219,255,.1),rgba(4,17,28,.22));border-radius:28px 0 0 28px}
+.brand b{color:#d3e0ee}.brand-symbol{background:linear-gradient(145deg,#dfefff70,#819ab934);border-color:#edf7ffc2;box-shadow:inset 0 1px #fff8,0 4px 12px #0002;color:white}
+.brand-symbol span{color:white}
+.nav-label,.sidebar-caption{color:#c0d0e0}
+.side-nav a{color:#d6e1ed;font-size:12px}
+.side-nav a>.icon{color:#d3e3f5}
+.side-nav a:hover{background:#e8f4ff18;color:white}
+.side-nav a.active{background:linear-gradient(120deg,#dfedff33,#9abdff16);border-color:#e3f1ff62;box-shadow:inset 0 1px #fff5,0 4px 14px #00132624;color:#fff}
+.nav-indicator{background:#e6f2ff;box-shadow:0 0 8px #e3eeff70}
+.ambient-toggle{background:linear-gradient(145deg,#e2f3ff15,#97b7e30b);border-color:#d1e4ff3b;color:#d7e6f7;border-radius:12px}
+.ambient-toggle:hover,.ambient-toggle[aria-pressed=true]{border-color:#d5e8ff60;color:#edf6ff}
+.sidebar-note{border-color:#e6f4ff29;color:#c5d5e8}
+.sidebar-note b{color:#f0f6ff}.sidebar-note>.icon{color:#dcecff}
+.topbar{border-color:#edf6ff33}
+.breadcrumb,.breadcrumb a,.breadcrumb>span:first-of-type{color:#dce7f2}
+.local-status{color:#e0eaf2}.local-status i{background:#a7f0cc;box-shadow:0 0 0 4px #b8ffe719}
+h1{text-shadow:0 2px 20px #06132238;font-weight:550}
+.subtitle{color:#e5edf4;font-size:14px}
+.release-copy p,.tool-card p{font-size:13px;color:#e0ebf4}
+.workflow-panel h3{font-size:13px}.workflow-panel p{font-size:12px}
+.side-nav a{font-size:13px}.tool-card h3{font-size:16px}
+.release-feature,.workflow-panel,.tool-card,.privacy-strip,.card{
+ background:linear-gradient(130deg,rgba(238,247,255,.09),rgba(183,210,238,.025) 44%,rgba(2,14,25,.24)),rgba(7,19,30,.14);
+ border-color:rgba(225,239,255,.35);box-shadow:inset 0 1px 0 rgba(255,255,255,.29),inset 1px 0 0 rgba(255,255,255,.1),0 10px 24px rgba(2,9,19,.1);
+}
+.release-feature{background:linear-gradient(126deg,rgba(209,229,255,.12),rgba(78,109,151,.06) 46%,rgba(192,219,255,.12)),rgba(7,19,30,.14);min-height:290px}
+.release-feature::before{background:linear-gradient(128deg,rgba(255,255,255,.1),transparent 35%,transparent 65%,rgba(235,247,255,.065));border-radius:inherit}
+.section-label{color:#d5e6fc}
+.release-copy p{color:#d5e1ed}
+.release-foot{color:#d1e0ef}
+.release-foot i{background:#d1e0ef}
+.file-stack>div{border-color:#f1f8ff99;box-shadow:inset 0 1px #fff8,0 10px 18px #00182a25}
+.file-stack>div:first-child{background:linear-gradient(145deg,#ebf6ff66,#abc9fa28)}
+.file-stack>div:nth-child(2){background:linear-gradient(145deg,#d5e9ff50,#a4c4ed18)}
+.file-stack>div:last-child{background:linear-gradient(140deg,#effaff42,#9fbbda36)}
+.file-stack .icon,.file-stack span{color:#f5faff}
+.file-stack i{background:#e2f1ff69}
+.btn{background:linear-gradient(145deg,rgba(234,244,255,.96),rgba(201,219,239,.9));border:1px solid rgba(255,255,255,.8);box-shadow:inset 0 1px #fff,0 4px 15px #07162729;color:#192d43;border-radius:11px;font-weight:650}
+.btn:hover:not(:disabled){background:#f4faff;border-color:#fff}
+.btn.secondary{background:linear-gradient(125deg,#e3efff24,#d6e8ff0c);border-color:#eff8ff4a;color:#f3f8ff;box-shadow:inset 0 1px #fff2}
+.btn.secondary:hover:not(:disabled){background:#e5f4ff30;border-color:#eff8ff80}
+.workflow-panel li>span{background:linear-gradient(135deg,#dcecff33,#dbeeff0b);border-color:#d8ebff69;color:white;box-shadow:inset 0 1px #fff4}
+.workflow-panel li:not(:last-child)::after{background:#e6f4ff38}
+.workflow-panel h3{color:#f5f9ff}
+.workflow-panel p{color:#c9d9e9}
+.section-heading p,.section-heading>span{color:#cddce9}
+.tool-card:hover{background:linear-gradient(130deg,#e9f5ff2c,#e2f1ff12);border-color:#f1faff99}
+.tool-icon,.tool-icon.convert,.tool-icon.merge{background:linear-gradient(145deg,#e5f3ff25,#aecae31c);border-color:#e5f3ff65;box-shadow:inset 0 1px #fff5;color:#eff8ff;border-radius:12px}
+.tool-card p{color:#d1dfeb}
+.tool-card small{color:#c0d1e1}
+.tool-card-footer{border-color:#ecf7ff2e;color:#eef7ff}
+.privacy-strip{background:linear-gradient(110deg,#e0f0ff14,#03172a1c)}
+.privacy-strip p{color:#c5d7e8}.privacy-strip b{color:#f2f7ff}.privacy-strip>.icon{color:#d4eaff}
+.app-footer{border-color:#e4f2ff33;color:#c3d5e5}
+.app-footer i{color:#ccddeb}
+.card{background:linear-gradient(135deg,rgba(213,233,250,.07),rgba(5,21,34,.32)),rgba(7,19,30,.14)}
+.file-count{background:#d4e9ff17;border-color:#eaf5ff38;color:#d5e7f8}
+.drop{background:linear-gradient(135deg,#02152826,#e5f5ff08);border-color:#e3f1ff61;color:#eff8ff}
+.drop:hover,.drop.dragover{background:#e4f4ff1c;border-color:#f2faffba}
+.drop>.icon{background:linear-gradient(145deg,#e6f3ff30,#aecdec10);border-color:#f3faff66;box-shadow:inset 0 1px #fff6;color:#f5faff}
+.drop span:not(.big),.drop small,.upload-note{color:#c7d9e9}
+.settings-help{background:#deefff0a;border-left-color:#e2f3ff88;color:#d6e5f3}
+.fld b,.check{color:#deebf6}
+input[type=text],input[type=email],input[type=url],input[type=number],textarea,select{background:rgba(3,19,34,.31);border-color:#d9ecff42;box-shadow:inset 0 1px 4px #0413221c;color:#f3f8ff;border-radius:9px}
+input::placeholder,textarea::placeholder{color:#b0c4d8}
+input:focus,textarea:focus,select:focus{border-color:#edf7ffa8;box-shadow:0 0 0 3px #d0e7ff19}
+select option{background:#203448;color:#f1f7ff}
+.hint{color:#bdcfe1}
+.chip{background:#0d294b40;border-color:#dcefff47;color:#dfefff}.chip a{color:#e9f5ff!important}
+.tone{background:#0921393b;border-color:#cee4ff40;color:#d9e9fc}
+.tone b{color:#f2f7ff}.tone p{color:#c4d8ed}.tone.sel{background:linear-gradient(125deg,#c1dbff38,#ccddf81a);border-color:#f3f9ff80;box-shadow:inset 0 1px #fff4}
+.release-tabs{background:#102b4633;border-color:#ddedff44;box-shadow:inset 0 1px #fff2}
+.release-tabs button{color:#d3e4f7}.release-tabs button span{color:#c7dbf5}
+.release-tabs button[aria-selected=true]{background:linear-gradient(125deg,#d7eaff3b,#dbebff18);border-color:#f2f8ff70;box-shadow:inset 0 1px #fff5;color:#fff}
+.release-tabs button[aria-selected=true] span{color:#f1f7ff}.release-tabs button:hover{background:#e0efff21}
+.step-actions{border-color:#eff8ff38}.step-actions>span{color:#c9daeb}
+.menu-button{background:linear-gradient(135deg,#e7f2ff29,#b9d8ff12);border-color:#deefff55;box-shadow:inset 0 1px #fff3}
+@media(min-width:1450px){body{padding:36px}.app-shell{min-height:calc(100svh - 72px)}.sidebar{height:calc(100svh - 74px)}}
+@media(max-width:1150px){body{padding:20px}.app-shell{min-height:calc(100svh - 40px)}.sidebar{height:calc(100svh - 42px)}}
+@media(max-width:760px){
+ body{padding:10px}.app-shell{min-height:calc(100svh - 20px);border:1px solid #e1f2ff59;border-radius:23px;overflow:clip;backdrop-filter:none;-webkit-backdrop-filter:none}
+ .app-main{backdrop-filter:blur(3px) saturate(115%);-webkit-backdrop-filter:blur(3px) saturate(115%);border-radius:22px}
+ .coastal-scene{background-image:url('../media/coast-poster-mobile.jpg')}
+ .sidebar{height:100svh;border-radius:0;background:#182c3ef5;backdrop-filter:none}
+ .container{padding:25px 17px}.topbar{margin:0 17px}.app-footer{margin:0 17px}
+ .release-copy{max-width:80%}.release-feature{padding:23px 20px 54px}.file-stack{right:12px;opacity:.5}
+ .card{padding:18px}.tones{grid-template-columns:1fr}.tool-card{padding-left:77px}
+}
+@supports not (backdrop-filter:blur(1px)){.app-shell{background:rgba(17,35,52,.78)}}

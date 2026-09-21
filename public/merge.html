@@ -6,49 +6,56 @@
 <title>Merge Images — WWA Publishers Tools</title>
 <link rel="icon" type="image/png" href="img/favicon.png">
 <link rel="stylesheet" href="css/style.css">
-<script src="js/lightbox.js"></script>
-<script src="js/ui.js"></script>
-<script src="js/nav.js" defer></script>
-</head>
-<body class="tool-page">
-<nav>
-  <a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true"><i></i></span>WWA <span>Tools</span></a>
-  <div class="nav-links">
-    <a class="link" href="zip.html">ZIP Creating</a>
-    <a class="link" href="resize.html">Resize</a>
-    <a class="link" href="convert.html">Convert</a>
-    <a class="link active" href="merge.html">Merge</a>
-  </div>
-  <a class="pill" href="index.html">Home</a>
-  <button class="burger" type="button" aria-label="Меню" aria-expanded="false" aria-controls="mobile-menu">
-    <span></span><span></span><span></span>
-  </button>
-</nav>
-<div class="menu-backdrop" id="menu-backdrop"></div>
-<div class="mobile-menu" id="mobile-menu">
-    <a class="link" href="zip.html">ZIP Creating</a>
-    <a class="link" href="resize.html">Resize</a>
-    <a class="link" href="convert.html">Convert</a>
-    <a class="link active" href="merge.html">Merge</a>
-  <a class="pill" href="index.html">Home</a>
-</div>
+<link rel="stylesheet" href="css/glass.css">
+<script src="js/lightbox.js" defer></script>
+<script src="js/ui.js" defer></script>
 
-<div class="container">
-  <p class="page-kicker">Workspace / Image utility</p>
+</head>
+<body class="tool-page merge-page">
+<a class="skip-link" href="#main">Перейти до вмісту</a>
+<div class="app-shell">
+  <aside class="sidebar" id="app-navigation" aria-label="Основна навігація">
+    <a class="brand" href="index.html"><span class="brand-symbol" aria-hidden="true">w<span>·</span></span><span>WWA <b>Tools</b></span></a>
+    <p class="nav-label">WORKSPACE</p>
+    <nav class="side-nav">
+      <a href="index.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>Огляд</span></a>
+      <a href="zip.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="M3 8v9l9 5 9-5V8M12 13v9M7.5 5.5l9 5"/></svg><span>Release Package</span></a>
+      <a href="resize.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3v14h14M3 7h14v14M3 3l3 3m12 12 3 3"/><path d="M14 3h7v7M21 3l-6 6"/></svg><span>Resize Images</span></a>
+      <a href="convert.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7a8 8 0 0 0-13-3L3 8m0-5v5h5M4 17a8 8 0 0 0 13 3l4-4m0 5v-5h-5"/></svg><span>Convert Images</span></a>
+      <a href="merge.html" class="active" aria-current="page"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="18" rx="2"/><rect x="14" y="3" width="7" height="18" rx="2"/></svg><span>Merge Images</span><i class="nav-indicator"></i></a>
+    </nav>
+    <div class="sidebar-bottom">
+      <button type="button" class="ambient-toggle" aria-pressed="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 11 7-11 7V5Z"/></svg><span>Призупинити відеофон</span></button>
+      <div class="sidebar-note"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3Z"/><path d="m8 12 3 3 5-6"/></svg><div><b>Ваші файли — у вас</b><p>Обробка зображень локально, без завантаження на сервер.</p></div></div>
+      <span class="sidebar-caption">WWA Publishers Tools</span>
+    </div>
+  </aside>
+  <button class="nav-backdrop" type="button" aria-label="Закрити меню" tabindex="-1" hidden></button>
+  <div class="app-main">
+    <header class="topbar">
+      <button class="menu-button" type="button" aria-label="Відкрити меню" aria-expanded="false" aria-controls="app-navigation"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+      <div class="breadcrumb"><a href="index.html">Workspace</a><span>/</span><span>Merge Images</span></div>
+      <span class="local-status"><i></i> Локальна обробка</span>
+    </header>
+<main id="main" class="container">
   <h1>Merge Images</h1>
   <p class="subtitle">Об’єднуйте зображення горизонтально, вертикально або сіткою та точно контролюйте відступи й формат.</p>
 
-  <div class="card">
-    <div class="drop" id="drop">
-      <span class="big">🖼️</span>
-      Перетягніть зображення сюди або натисніть, щоб обрати (2 і більше)<br>
-      <span class="hint">Порядок можна змінювати стрілками на мініатюрах</span>
+  <div class="tool-grid">
+  <section class="card upload-panel">
+    <div class="panel-heading"><h2>Вихідні зображення</h2><span class="file-count" aria-live="polite">0 файлів</span></div>
+    <div class="drop" id="drop" role="button" tabindex="0" aria-label="Обрати зображення">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V3m-5 5 5-5 5 5M4 15v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/></svg>
+      <b>Перетягніть зображення сюди</b><span>або натисніть, щоб обрати файли</span><small>Від 2 зображень · порядок можна змінювати</small>
     </div>
     <input type="file" id="input" accept="image/*" multiple hidden>
     <div class="thumbs" id="thumbs"></div>
-  </div>
+    <p class="upload-note">Файли залишаються у вашому браузері</p>
+  </section>
 
-  <div class="card" id="controls" style="display:none">
+  <section class="card settings-panel" id="controls">
+    <p class="settings-help">Додайте щонайменше два зображення, щоб розпочати.</p>
+    <fieldset id="controlFields" disabled>
     <h2>Налаштування</h2>
     <div class="row">
       <label class="fld" style="margin:0"><b>Напрямок</b>
@@ -58,7 +65,7 @@
           <option value="grid">Сітка</option>
         </select>
       </label>
-      <label class="fld" style="margin:0" id="colsWrap" style="display:none"><b>Колонок у сітці</b>
+      <label class="fld" style="margin:0" id="colsWrap"><b>Колонок у сітці</b>
         <input type="number" id="cols" min="1" value="2" style="width:100px">
       </label>
       <label class="fld" style="margin:0"><b>Вирівнювання розмірів</b>
@@ -95,7 +102,12 @@
     <div class="preview-box" id="previewBox" style="display:none">
       <canvas id="canvas"></canvas>
     </div>
+    </fieldset>
+  </section>
   </div>
+</main>
+<footer class="app-footer"><span>Зображення обробляються на вашому пристрої.</span><span>WWA Tools <i>•</i> Publishing workspace</span></footer>
+</div>
 </div>
 
 <script>
@@ -146,7 +158,7 @@ function render() {
     });
     box.appendChild(d);
   });
-  $('controls').style.display = items.length >= 2 ? '' : 'none';
+  $('controlFields').disabled = items.length < 2;
 }
 
 $('direction').onchange = () => {
