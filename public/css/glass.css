@@ -12,7 +12,7 @@
 html{background:#101e32}
 body{position:relative;isolation:isolate;margin:0;padding:0;min-height:100svh;background:transparent;font-family:var(--font);overflow-x:clip}
 body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(180deg,#0c1a364d,#13244326 30%,#11234042 70%,#08132199)}
-.coastal-scene{position:fixed;inset:0;z-index:-2;pointer-events:none;overflow:hidden;background:#102034 url('../media/mountains-poster-v1.jpg') center/cover no-repeat}
+.coastal-scene{position:fixed;inset:0;z-index:-2;pointer-events:none;overflow:hidden;background:#102034 url('../media/mountains-poster-v2.jpg') center/cover no-repeat}
 .coastal-video{display:block;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .5s ease}
 .video-ready .coastal-video{opacity:1}
 .tool-page::before{background:linear-gradient(110deg,#09162b9e,#0a1325c9)}
@@ -71,7 +71,6 @@ select option{background:#171b26}
 .home-signature{position:absolute;bottom:30px;left:40px;color:#e0e9f3aa;font-size:10px;letter-spacing:.15em}
 @media(max-width:1000px){.tool-grid{grid-template-columns:1fr}}
 @media(max-width:760px){
- .coastal-scene{background-image:url('../media/mountains-poster-mobile-v1.jpg')}
  .tool-page .app-main{width:calc(100% - 24px);margin-bottom:16px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
  .tool-page .container{padding:20px}.card{padding:18px}
  h1{font-size:29px;letter-spacing:-.6px}.subtitle{font-size:13px}
@@ -85,6 +84,7 @@ select option{background:#171b26}
 }
 @media(max-width:540px){.tool-page .container{padding:18px 12px}h1{font-size:27px}.card h2{font-size:18px}.drop{min-height:220px}}
 @media(max-width:360px){.home-content h1{font-size:32px}}
+@media(max-width:760px) and (orientation:portrait){.coastal-scene{background-image:url('../media/mountains-poster-mobile-v2.jpg')}}
 @media(prefers-reduced-motion:reduce){.hero-cta{transition:none}}
 
 /* Motion changes only opacity/transform; glass blur itself is never animated. */

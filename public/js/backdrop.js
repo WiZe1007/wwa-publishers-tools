@@ -34,7 +34,13 @@ export function startBackdrop() {
     if (!wantsMotion || document.hidden) return;
     const request = ++playRequest;
     if (!video) {
-      const mobile = matchMedia('(max-width: 760px)').matches;
+      const mobile = matchMedia('(max-width: 760px) and (orientation: portrait)').matches;
+      // Match physical cover resolution, not just CSS width (Retina needs 4K).
+      // Select once: no speculative alternate downloads or navigation restarts.
+      const coverScale = Math.max(window.innerWidth / 1920, window.innerHeight / 1080);
+      const needsUltra = coverScale * Math.min(window.devicePixelRatio || 1, 2) > 1.15;
+      const limitedConnection = connection?.effectiveType === '3g';
+      const rendition = mobile ? 'mobile' : needsUltra && !limitedConnection ? 'ultra' : 'desktop';
       video = document.createElement('video');
       video.className = 'coastal-video';
       video.muted = true;
@@ -44,14 +50,25 @@ export function startBackdrop() {
       video.preload = 'metadata';
       video.disablePictureInPicture = true;
       video.setAttribute('aria-hidden', 'true');
-      video.poster = mobile ? 'media/mountains-poster-mobile-v1.jpg' : 'media/mountains-poster-v1.jpg';
-      video.src = mobile ? 'media/mountains-mobile-v1.mp4' : 'media/mountains-desktop-v1.mp4';
+      video.poster = mobile ? 'media/mountains-poster-mobile-v2.jpg' : 'media/mountains-poster-v2.jpg';
+      const standardSource = `media/mountains-${rendition}-v2.mp4`;
+      const efficient4K = rendition === 'ultra' && video.canPlayType('video/mp4; codecs="hvc1.1.6.L153.B0"');
+      video.src = efficient4K ? 'media/mountains-ultra-hevc-v2.mp4' : standardSource;
+      let canFallback = Boolean(efficient4K);
       const reveal = () => scene.classList.add('video-ready');
       video.addEventListener('playing', () => {
         if ('requestVideoFrameCallback' in video) video.requestVideoFrameCallback(reveal);
         else reveal();
       });
       video.addEventListener('error', () => {
+        // Some devices advertise HEVC but cannot decode this profile in practice.
+        if (canFallback) {
+          canFallback = false;
+          scene.classList.remove('video-ready');
+          video.src = standardSource;
+          play();
+          return;
+        }
         pause();
         scene.classList.remove('video-ready');
         wantsMotion = false;
