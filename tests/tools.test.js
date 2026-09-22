@@ -118,7 +118,7 @@ describe('stripVideoMetadata — очищення MP4', () => {
 
   test('пошкоджений файл відхиляється, а не позначається очищеним', async () => {
     const junk = Buffer.from([0xff, 0xff, 0xff, 0xff, 0x61, 0x62, 0x63, 0x64, 0x00, 0x01]);
-    await assert.rejects(() => strip(fakeFile(junk)), /Invalid MP4\/MOV block size/);
+    await assert.rejects(() => strip(fakeFile(junk)), /розмір блоку/);
   });
 
   test('дата файлу нормалізується', async () => {
