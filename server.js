@@ -170,6 +170,43 @@ SEO-БАЗА (незмінна): визнач 3–5 цільових ключо�
 
 ЕМОДЗІ: мінімально — максимум 2–3 на весь опис, лише поруч із заголовками секцій (не в кожному). НЕ використовуй емодзі як марери списків.
 ТОН: спокійний, оповідний, "редакційний" — інша інтонація, ніж у стандартному ASO Pro. Весь фактичний зміст — виключно з опису розробника та скріншотів.`,
+  tiktok_aso_max: `Стиль опису — TIKTOK × ASO PRO (МАКСИМУМ ОРГАНІКИ): повна ASO-методологія + compliance-шаблон social casino. Ціль — стабільний топ органічної видачі Google Play.
+
+━━ КРОК 1. СЕМАНТИЧНЕ ЯДРО ━━
+Проаналізуй назву, опис розробника та скріншоти і побудуй ядро:
+- 1 головне ключове слово (найчастотніший запит, яким шукають такий додаток);
+- 3–4 другорядні ключі (жанр, механіка, ключова функція);
+- 4–6 long-tail фраз із 2–4 слів (як реально шукають: "tap to win game", "free casual puzzle offline" тощо);
+- синоніми та морфологічні варіанти для семантичної близькості (Google Play розуміє синонімію).
+НІЧОГО не вигадуй: кожен ключ має відповідати реальному функціоналу з опису розробника чи скріншотів.
+
+━━ КРОК 2. SHORT DESCRIPTION (індексується, найвища вага після назви) ━━
+Формат: назва додатку, потім двокрапка або знак оклику, далі основна частина, у кінці крапка або знак оклику. До 80 символів включно. В основній частині — головне ключове слово + 1 другорядний, природною мовою. Не дублюй головний ключ із назви додатку двічі.
+
+━━ КРОК 3. FULL DESCRIPTION — структура ━━
+1. ХУК (перші 167 символів — видимі без "more"): головне ключове слово ОБОВ'ЯЗКОВО тут, бажано в першому реченні. Додаток описується як "social casino experience", де "simulated chance" поєднано з "virtual challenge", для розваги, "without any real-money gambling".
+2. "How to Play:" — механіка сесії зі згадкою 1–2 другорядних ключів. Обов'язкова фраза: "Players interact with virtual elements".
+3. "Game Features:" — 5–7 пунктів у форматі "Функція: вигода". У пунктах природно розподіли другорядні ключі та long-tail фрази (по одному ключу на пункт, не більше).
+4. "Skill vs. Luck:" — це "social casino experience centered on simulated luck"; результати віртуальні й "do not represent real-money gambling"; рішення гравця впливають на сесію, але не гарантують виграш.
+5. "Prizes/Rewards:" — гравці отримують "virtual progress" та результати всередині додатку. "These have no real-world monetary value."
+6. "Cash Out Rules:" — ДОСЛІВНО: "Real-money cash-outs are strictly blocked. Virtual progress and results cannot be withdrawn, exchanged for cash, or redeemed for gift cards."
+7. "In-App Purchases:" — якщо покупки не згадані розробником, ДОСЛІВНО: "No in-app purchases are available. 18+. For entertainment purposes only." Якщо згадані — чесно опиши, що купується, і збережи "18+. For entertainment purposes only."
+8. ФІНАЛЬНИЙ SEO-АБЗАЦ (ключовий для органіки): 2–3 зв'язні речення, у які природно вплетені long-tail фрази, синоніми та жанрові терміни. Це має читатися як нормальний текст, а НЕ як перелік ключів через кому — за перелік Google карає.
+
+━━ КРОК 4. ПРАВИЛА ЩІЛЬНОСТІ (перевіряється автоматично) ━━
+- Головне ключове слово: 4–5 входжень на весь опис, рівномірно (хук → features → фінальний абзац), не підряд.
+- Кожен другорядний ключ: 2–3 входження.
+- ЖОДНЕ значуще слово не має перевищувати ліміт повторів, указаний у загальних вимогах вище. Рахуються разом усі форми: однина/множина, -ing/-ed, частини складених слів через дефіс.
+- Перед відповіддю подумки перелічи входження найчастіших слів; якщо ліміт перевищено — заміни синонімами та перепиши.
+
+━━ КРОК 5. ЗАБОРОНИ (інакше бан або пессимізація) ━━
+- Без слів удачі/азарту: luck як обіцянка виграшу, fortune, jackpot, casino як заклад, bet, win real money, cash prize.
+- Без "#1", "best app", "top rated", без згадок конкурентів, цін, рейтингів та вигаданих цифр.
+- Без КАПСУ (крім абревіатур), без "!!!", без переліку ключів через кому.
+- Кожна згадана функція має підтверджуватися описом розробника або скріншотами.
+
+ЕМОДЗІ: не використовуй — чистий формальний текст, як у шаблоні TikTok ASO Pro.
+ОБОВ'ЯЗКОВІ ФРАЗИ (мають бути дослівно): "social casino experience", "simulated luck", "virtual progress", "Players interact with virtual elements", "do not represent real-money gambling".`,
   tiktok_aso_pro: `Стиль опису — TIKTOK ASO PRO (методологія ASO Pro + шаблон social casino compliance):
 
 БАЗА — методологія ASO Pro: спочатку визнач 3–5 цільових ключових слів з назви, опису та скріншотів; у short description (після назви) — 2–3 ключові слова природно; головне ключове слово в перших 167 символах full description; щільність головного ключа 3–5 разів (точна форма + варіанти), без keyword stuffing.
@@ -429,7 +466,7 @@ Rewrite the description so that:
 2. The meaning, features and overall length stay the same.
 3. Do NOT add features that are not mentioned.
 4. Keep it natural, high-quality English for Google Play.
-5. Keep the same marketing tone and energy as the original text, including all emojis and formatting.${tone === 'tiktok_aso_pro' ? `
+5. Keep the same marketing tone and energy as the original text, including all emojis and formatting.${(tone === 'tiktok_aso_pro' || tone === 'tiktok_aso_max') ? `
 6. CRITICAL: Do NOT modify the mandatory compliance sentences ("Cash Out Rules: Real-money cash-outs are strictly blocked..." and "In-App Purchases: ...") and do NOT remove the required phrases: "social casino experience", "simulated luck", "virtual progress", "Players interact with virtual elements", "do not represent real-money gambling". Reduce word repetition ONLY in other parts of the text.` : ''}
 
 Description:
@@ -487,7 +524,15 @@ Respond STRICTLY as JSON without markdown:
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`WWA Publishers Tools running on http://localhost:${PORT}`);
-  if (!API_KEY) console.warn('⚠  ANTHROPIC_API_KEY не заданий — сторінка ZIP Creating не зможе генерувати описи.');
-});
+// Запускаємо сервер лише при прямому виклику — щоб тести могли підключити модуль
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`WWA Publishers Tools running on http://localhost:${PORT}`);
+    if (!API_KEY) console.warn('⚠  ANTHROPIC_API_KEY не заданий — сторінка ZIP Creating не зможе генерувати описи.');
+  });
+}
+
+module.exports = {
+  app, analyzeText, normalize, tokenize, wordFrequency, findSpam,
+  TONE_INSTRUCTIONS, SIZE_INSTRUCTIONS, SIZE_MAX_REPEATS, SPAM_DENSITY, extractJSON
+};

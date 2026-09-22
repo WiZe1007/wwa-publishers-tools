@@ -4,7 +4,8 @@
   "description": "WWA Publishers Tools - internal toolkit for app publishing",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test --experimental-vm-modules \"tests/*.test.js\""
   },
   "engines": {
     "node": ">=18"
