@@ -1,3 +1,5 @@
+import { FIXED_DATE, isImage, isVideo, stripImageMetadata, stripVideoMetadata } from '../metadata.js';
+
 // Each tool owns its DOM and state, including while detached during navigation.
 export function mount(root) {
 // ================= State =================
@@ -358,87 +360,6 @@ function resetMetaClean() {
     st.className = 'status err';
     st.textContent = '⚠ Додано нові файли — натисніть «Очистити метадані» ще раз.';
   }
-}
-
-// Перемальовуємо зображення через canvas — це відкидає EXIF/XMP/ICC та інші теги
-function stripImageMetadata(file) {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      const c = document.createElement('canvas');
-      c.width = img.width; c.height = img.height;
-      const ctx = c.getContext('2d');
-      let type = file.type;
-      if (!['image/png', 'image/jpeg', 'image/webp'].includes(type)) type = 'image/png';
-      if (type === 'image/jpeg') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); }
-      ctx.drawImage(img, 0, 0);
-      c.toBlob(blob => {
-        URL.revokeObjectURL(url);
-        if (!blob) return reject(new Error('Не вдалося обробити ' + file.name));
-        // Ім'я зберігаємо, час файлу — нейтральний
-        resolve(new File([blob], file.name, { type, lastModified: FIXED_DATE.getTime() }));
-      }, type, type === 'image/jpeg' ? 0.96 : undefined);
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Не зображення: ' + file.name)); };
-    img.src = url;
-  });
-}
-
-const FIXED_DATE = new Date('2020-01-01T00:00:00Z');
-const isImage = f => (f.type || '').startsWith('image/');
-const isVideo = f => (f.type || '').startsWith('video/') || /\.(mp4|mov|m4v)$/i.test(f.name);
-
-// Очищення метаданих MP4/MOV без перекодування.
-// Блоки з метаданими (udta, meta, uuid) перетворюються на порожні "free" ТОГО Ж РОЗМІРУ,
-// а дати створення/зміни обнуляються — байтові зсуви не змінюються, відео лишається валідним.
-function stripVideoMetadata(file) {
-  return file.arrayBuffer().then(buf => {
-    const dv = new DataView(buf);
-    const u8 = new Uint8Array(buf);
-    const txt = (o, n) => String.fromCharCode(...u8.subarray(o, o + n));
-    let wiped = 0;
-
-    // Перетворити блок на "free" і затерти вміст
-    const toFree = (start, size, hdr) => {
-      u8.set([0x66, 0x72, 0x65, 0x65], start + 4);           // 'free'
-      u8.fill(0, start + hdr, start + size);
-      wiped++;
-    };
-
-    // Обнулити creation_time / modification_time у mvhd, tkhd, mdhd
-    const zeroTimes = (start, hdr) => {
-      const version = dv.getUint8(start + hdr);
-      const p = start + hdr + 4;                              // після version+flags
-      if (version === 1) { dv.setBigUint64(p, 0n); dv.setBigUint64(p + 8, 0n); }
-      else { dv.setUint32(p, 0); dv.setUint32(p + 4, 0); }
-    };
-
-    const walk = (start, end, depth) => {
-      let off = start;
-      while (off + 8 <= end) {
-        let size = dv.getUint32(off);
-        const type = txt(off + 4, 4);
-        let hdr = 8;
-        if (size === 1) { size = Number(dv.getBigUint64(off + 8)); hdr = 16; }
-        else if (size === 0) size = end - off;
-        if (size < hdr || off + size > end) break;            // пошкоджена структура — зупиняємось
-
-        if (type === 'udta' || type === 'meta' || type === 'uuid') {
-          toFree(off, size, hdr);                             // теги, GPS, дані пристрою
-        } else if (type === 'mvhd' || type === 'tkhd' || type === 'mdhd') {
-          zeroTimes(off, hdr);
-        } else if (['moov', 'trak', 'mdia', 'edts', 'minf', 'stbl'].includes(type) && depth < 5) {
-          walk(off + hdr, off + size, depth + 1);
-        }
-        off += size;
-      }
-    };
-
-    walk(0, buf.byteLength, 0);
-    if (!wiped) return null;                                  // нічого не знайдено — файл не чіпаємо
-    return new File([buf], file.name, { type: file.type || 'video/mp4', lastModified: FIXED_DATE.getTime() });
-  });
 }
 
 $('cleanMetaBtn').onclick = async () => {

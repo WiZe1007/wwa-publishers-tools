@@ -5,7 +5,8 @@ const loaders = {
   zip: () => import('./tools/zip.js'),
   resize: () => import('./tools/resize.js'),
   convert: () => import('./tools/convert.js'),
-  merge: () => import('./tools/merge.js')
+  merge: () => import('./tools/merge.js'),
+  metadata: () => import('./tools/metadata.js')
 };
 const routes = new Set(['index', ...Object.keys(loaders)]);
 
@@ -14,7 +15,7 @@ export async function startNavigation(closeMenu) {
   let sequence = 0;
   const routeFor = url => {
     if (url.origin !== location.origin || url.hash) return null;
-    const match = url.pathname.match(/^\/(index|zip|resize|convert|merge)\.html$/);
+    const match = url.pathname.match(/^\/(index|zip|resize|convert|merge|metadata)\.html$/);
     return url.pathname === '/' ? 'index' : match?.[1] || null;
   };
   function entryFrom(doc, route) {

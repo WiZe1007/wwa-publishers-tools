@@ -99,3 +99,17 @@ select option{background:#171b26}
  @media(hover:hover){.hero-cta:hover,.btn:hover:not(:disabled){transform:translateY(-2px)}}
 }
 @keyframes nav-settle{from{opacity:.65}to{opacity:1}}
+
+.metadata-page .tool-grid{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr)}
+.metadata-queue{padding:0;margin:18px 0 0;list-style:none;display:grid;gap:10px}
+.metadata-file{display:flex;align-items:center;flex-wrap:wrap;gap:10px;padding:12px;border:1px solid var(--glass-edge);border-radius:10px;background:#ffffff04}
+.metadata-file-info{flex:1 1 170px;min-width:0;display:grid;gap:5px}
+.metadata-file-info strong{font-size:13px;font-weight:500;overflow-wrap:anywhere}
+.metadata-file-info span{font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.metadata-file-info .err{color:var(--red)}
+.metadata-notes{padding-left:18px;margin:0 0 20px;color:var(--muted);font-size:13px;line-height:1.7}
+.metadata-notes li+li{margin-top:12px}
+.metadata-page progress{width:100%;height:6px;accent-color:var(--accent);margin:16px 0 4px}
+.metadata-page .status{overflow-wrap:anywhere}
+.metadata-page .drop[aria-disabled=true]{opacity:.55;cursor:wait}
+@media(max-width:1000px){.metadata-page .tool-grid{grid-template-columns:1fr}}

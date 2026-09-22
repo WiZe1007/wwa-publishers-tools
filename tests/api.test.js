@@ -17,7 +17,7 @@ const post = (p, body) => fetch(base + p, {
 });
 
 describe('Сторінки віддаються', () => {
-  for (const page of ['/', '/zip.html', '/resize.html', '/convert.html', '/merge.html']) {
+  for (const page of ['/', '/zip.html', '/resize.html', '/convert.html', '/merge.html', '/metadata.html']) {
     test(page, async () => {
       const r = await get(page);
       assert.strictEqual(r.status, 200);
@@ -30,7 +30,7 @@ describe('Сторінки віддаються', () => {
 
 describe('Статичні ресурси', () => {
   for (const asset of ['/css/style.css', '/js/ui.js', '/js/tools/zip.js', '/js/tools/resize.js',
-                       '/js/tools/convert.js', '/js/tools/merge.js', '/js/vendor/jszip.min.js']) {
+                       '/js/tools/convert.js', '/js/tools/merge.js', '/js/metadata.js', '/js/tools/metadata.js', '/js/vendor/jszip.min.js']) {
     test(asset, async () => assert.strictEqual((await get(asset)).status, 200));
   }
 });

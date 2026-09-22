@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Очищення метаданих — WWA Tools</title>
+<link rel="icon" type="image/png" href="img/wwa-logo.png">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/glass.css">
+<link rel="stylesheet" href="css/navigation.css">
+<script src="js/vendor/jszip.min.js" defer></script>
+<script src="js/lightbox.js" defer></script>
+<script type="module" src="js/ui.js"></script>
+
+</head>
+<body class="tool-page metadata-page">
+<a class="skip-link" href="#main">Перейти до вмісту</a>
+<div class="app-shell">
+  <header class="workspace-header" id="app-navigation" aria-label="Основна навігація">
+    <a class="brand" href="index.html"><img src="img/wwa-logo.png" width="30" height="30" alt=""><span>WWA Tools</span></a>
+    <nav class="top-nav" id="primary-links">
+      <a href="index.html"><span>Огляд</span></a>
+      <a href="zip.html"><span>Release Package</span></a>
+      <a href="resize.html"><span>Resize</span></a>
+      <a href="convert.html"><span>Convert</span></a>
+      <a href="merge.html"><span>Merge</span></a>
+      <a href="metadata.html" class="active" aria-current="page"><span>Метадані</span></a>
+    </nav>
+    <button type="button" class="ambient-toggle" aria-pressed="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 11 7-11 7V5Z"/></svg><span>Призупинити відеофон</span></button>
+    <button class="theme-toggle" type="button" aria-label="Увімкнути темну тему" aria-pressed="false" title="Темна тема"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.4 1.4m11.2 11.2L19 19M5 19l1.4-1.4M17.6 6.4 19 5"/></svg></button>
+    <button class="menu-button" type="button" aria-label="Відкрити меню" aria-expanded="false" aria-controls="primary-links"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+  </header>
+  <div class="app-main">
+    <header class="topbar">
+      <div class="breadcrumb"><a href="index.html">Workspace</a><span>/</span><span>Метадані</span></div>
+      <span class="local-status"><i></i> Локальна обробка</span>
+    </header>
+<main id="main" class="container">
+  <h1>Очищення метаданих</h1>
+  <p class="subtitle">Приберіть приховані теги із зображень та відео перед публікацією. Локально у браузері — без завантаження файлів на сервер.</p>
+  <div class="tool-grid">
+    <section class="card">
+      <div class="panel-heading"><h2>Ваші файли</h2><span class="file-count" id="fileCount">Файлів: 0</span></div>
+      <div class="drop" id="drop" role="button" tabindex="0" aria-label="Обрати файли для очищення">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V3m-5 5 5-5 5 5M4 15v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/></svg>
+        <b>Перетягніть файли сюди</b><span>або натисніть, щоб обрати</span><small>JPEG, PNG, WebP · MP4, MOV, M4V</small>
+      </div>
+      <input type="file" id="input" accept=".jpg,.jpeg,.png,.webp,.mp4,.mov,.m4v" multiple hidden>
+      <p class="upload-note">До 50 файлів / 400 МБ разом. Зображення — до 32 МБ та 40 Мп; відео — до 200 МБ.</p>
+      <p class="hint" id="emptyQueue">Додайте файли — очищені копії з’являться тут.</p>
+      <ul class="metadata-queue" id="fileQueue" aria-label="Файли для очищення"></ul>
+    </section>
+    <section class="card">
+      <h2>Що буде очищено</h2>
+      <ul class="metadata-notes">
+        <li><b>Зображення:</b> вихідні EXIF, GPS, XMP, ICC та інші теги відкидаються під час повторного збереження. Розміри зберігаються; JPEG/WebP можуть трохи змінитися через стиснення, колір — через вилучення профілю.</li>
+        <li><b>MP4 / MOV / M4V:</b> стандартні блоки метаданих контейнера видаляються, дати створення й зміни обнуляються. Відео та аудіо не перекодовуються.</li>
+        <li><b>Оригінали не змінюються.</b> Результати мають суфікс _clean; часові мітки в ZIP уніфіковано.</li>
+      </ul>
+      <p class="settings-help">Анімовані PNG/WebP та інші формати не підтримуються. Очищення не приховує назви файлів, видимий текст, обличчя чи дані всередині аудіо/відеопотоку й не гарантує повної анонімності.</p>
+      <div class="row">
+        <button class="btn" id="cleanBtn" type="button" disabled>Очистити метадані</button>
+        <button class="btn secondary" id="clearBtn" type="button" disabled>Очистити список</button>
+      </div>
+      <progress id="progress" max="1" value="0" aria-label="Прогрес очищення" hidden></progress>
+      <p class="status" id="status" role="status" aria-live="polite"></p>
+      <button class="btn secondary" id="downloadZip" type="button" hidden>Скачати очищені файли ZIP</button>
+    </section>
+  </div>
+</main>
+<footer class="app-footer"><span>Файли обробляються лише на вашому пристрої.</span><span>WWA Tools <i>•</i> Publishing workspace</span></footer>
+</div>
+</div>
+
+
+</body>
+</html>
+

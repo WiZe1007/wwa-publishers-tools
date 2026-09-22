@@ -7,7 +7,7 @@ const { TONE_INSTRUCTIONS } = require('../server.js');
 
 const ROOT = path.join(__dirname, '..');
 const PUB = path.join(ROOT, 'public');
-const PAGES = ['index.html', 'zip.html', 'resize.html', 'convert.html', 'merge.html'];
+const PAGES = ['index.html', 'zip.html', 'resize.html', 'convert.html', 'merge.html', 'metadata.html'];
 const read = (p) => fs.readFileSync(path.join(PUB, p), 'utf8');
 
 describe('Синтаксис JS', () => {

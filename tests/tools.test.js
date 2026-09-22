@@ -22,7 +22,7 @@ function extractFunction(file, name) {
 
 /* ─────────── Очищення метаданих відео ─────────── */
 describe('stripVideoMetadata — очищення MP4', () => {
-  const source = extractFunction('js/tools/zip.js', 'stripVideoMetadata');
+  const source = 'async ' + extractFunction('js/metadata.js', 'stripVideoMetadata');
   const FIXED_DATE = new Date('2020-01-01T00:00:00Z');
   const strip = new Function('File', 'FIXED_DATE', `${source}; return stripVideoMetadata;`)(
     globalThis.File || require('node:buffer').File, FIXED_DATE);
@@ -100,19 +100,25 @@ describe('stripVideoMetadata — очищення MP4', () => {
     assert.strictEqual(cleaned[mdat + 4], 0x42, 'відеодані не мають змінюватись');
   });
 
-  test('файл без метаданих не чіпається (повертає null)', async () => {
+  test('дати очищуються навіть без udta/meta/uuid', async () => {
     const box = (type, payload) => {
       const b = Buffer.alloc(8 + payload.length);
       b.writeUInt32BE(8 + payload.length, 0); b.write(type, 4, 'ascii'); payload.copy(b, 8);
       return b;
     };
-    const plain = Buffer.concat([box('ftyp', Buffer.from('isom')), box('mdat', Buffer.alloc(32))]);
-    assert.strictEqual(await strip(fakeFile(plain)), null);
+    const times = Buffer.alloc(100); times.writeUInt32BE(12345, 4); times.writeUInt32BE(67890, 8);
+    const plain = Buffer.concat([box('ftyp', Buffer.from('isom')), box('moov', box('mvhd', times)), box('mdat', Buffer.alloc(32, 42))]);
+    const output = Buffer.from(await (await strip(fakeFile(plain))).arrayBuffer());
+    const offset = output.indexOf('mvhd');
+    assert.strictEqual(output.readUInt32BE(offset + 8), 0);
+    assert.strictEqual(output.readUInt32BE(offset + 12), 0);
+    assert.strictEqual(output.length, plain.length);
+    assert.deepStrictEqual(output.subarray(output.indexOf('mdat') + 4), Buffer.alloc(32, 42));
   });
 
-  test('пошкоджений файл не кидає виняток', async () => {
+  test('пошкоджений файл відхиляється, а не позначається очищеним', async () => {
     const junk = Buffer.from([0xff, 0xff, 0xff, 0xff, 0x61, 0x62, 0x63, 0x64, 0x00, 0x01]);
-    await assert.doesNotReject(() => strip(fakeFile(junk)));
+    await assert.rejects(() => strip(fakeFile(junk)), /розмір блоку/);
   });
 
   test('дата файлу нормалізується', async () => {
