@@ -3,7 +3,7 @@ import { FIXED_DATE, metadataKind, stripImageMetadata, stripVideoMetadata } from
 export function mount(root) {
   const $ = id => root.querySelector('#' + id);
   let entries = [], busy = false;
-  const formatSize = size => size < 1048576 ? `${(size / 1024).toFixed(1)} КБ` : `${(size / 1048576).toFixed(1)} МБ`;
+  const formatSize = size => size < 1048576 ? `${(size / 1024).toFixed(1)} KB` : `${(size / 1048576).toFixed(1)} MB`;
   const announce = (text, error = false) => { $('status').textContent = text; $('status').className = 'status' + (error ? ' err' : ''); };
   const safeName = name => name.replace(/[\\/\x00-\x1f]/g, '_');
   function outputName(file) {
@@ -12,23 +12,23 @@ export function mount(root) {
   }
   function render() {
     $('fileQueue').replaceChildren();
-    $('fileCount').textContent = `Файлів: ${entries.length}`;
+    $('fileCount').textContent = `Files: ${entries.length}`;
     $('emptyQueue').hidden = entries.length > 0;
     for (const entry of entries) {
       const row = document.createElement('li'); row.className = 'metadata-file';
       const info = document.createElement('div'); info.className = 'metadata-file-info';
       const name = document.createElement('strong'); name.textContent = entry.file.name;
       const detail = document.createElement('span');
-      detail.textContent = `${formatSize(entry.file.size)} · ${entry.message || (entry.kind === 'video' ? 'Відео · без перекодування' : 'Зображення')}`;
+      detail.textContent = `${formatSize(entry.file.size)} · ${entry.message || (entry.kind === 'video' ? 'Video · no re-encoding' : 'Image')}`;
       if (entry.error) detail.className = 'status err';
       info.append(name, detail); row.append(info);
       if (entry.url) {
         const link = document.createElement('a'); link.className = 'btn secondary small';
-        link.href = entry.url; link.download = outputName(entry.result); link.textContent = 'Скачати';
-        link.setAttribute('aria-label', `Скачати ${entry.file.name}`); row.append(link);
+        link.href = entry.url; link.download = outputName(entry.result); link.textContent = 'Download';
+        link.setAttribute('aria-label', `Download ${entry.file.name}`); row.append(link);
       }
       const remove = document.createElement('button'); remove.className = 'btn secondary small'; remove.type = 'button';
-      remove.textContent = '×'; remove.disabled = busy; remove.setAttribute('aria-label', `Прибрати ${entry.file.name}`);
+      remove.textContent = '×'; remove.disabled = busy; remove.setAttribute('aria-label', `Remove ${entry.file.name}`);
       remove.onclick = () => { if (entry.url) URL.revokeObjectURL(entry.url); entries = entries.filter(item => item !== entry); render(); announce(''); };
       row.append(remove); $('fileQueue').append(row);
     }
@@ -52,7 +52,7 @@ export function mount(root) {
       total += file.size; entries.push({ file, kind });
     }
     render();
-    announce(skipped ? `Пропущено файлів: ${skipped}. Перевірте формати й обмеження розміру нижче.` : 'Файли додано. Натисніть «Очистити метадані».', skipped > 0);
+    announce(skipped ? `Skipped: ${skipped}. Check the supported formats and size limits below.` : 'Files added. Click “Clean metadata” to continue.', skipped > 0);
   }
   $('drop').onclick = () => { if (!busy) $('input').click(); };
   $('input').onchange = () => { addFiles([...$('input').files]); $('input').value = ''; };
@@ -62,7 +62,7 @@ export function mount(root) {
   });
   $('clearBtn').onclick = () => {
     for (const entry of entries) if (entry.url) URL.revokeObjectURL(entry.url);
-    entries = []; render(); announce('Список очищено. Оригінальні файли не змінювалися.');
+    entries = []; render(); announce('List cleared. Your original files were not changed.');
   };
   $('cleanBtn').onclick = async () => {
     if (busy) return;
@@ -71,23 +71,23 @@ export function mount(root) {
     try {
       for (const [index, entry] of entries.entries()) {
         if (!entry.result) {
-          announce(`Очищення ${index + 1} із ${entries.length}: ${entry.file.name}`);
+          announce(`Cleaning ${index + 1} of ${entries.length}: ${entry.file.name}`);
           try {
             entry.result = await (entry.kind === 'image' ? stripImageMetadata(entry.file) : stripVideoMetadata(entry.file));
             entry.url = URL.createObjectURL(entry.result); entry.error = false;
-            entry.message = `Готово · ${formatSize(entry.result.size)}`;
-          } catch (error) { entry.error = true; entry.message = error.message || 'Не вдалося очистити файл.'; failed++; }
+            entry.message = `Ready · ${formatSize(entry.result.size)}`;
+          } catch (error) { entry.error = true; entry.message = error.message || 'Could not clean this file.'; failed++; }
         }
         $('progress').value = index + 1; render();
         await new Promise(resolve => setTimeout(resolve, 0));
       }
       const count = entries.filter(entry => entry.result).length;
-      announce(`Готово: ${count} із ${entries.length}.` + (failed ? ` Помилок: ${failed}; ці файли не включено до завантаження.` : ' Можна скачати файли окремо або одним ZIP.'), failed > 0);
+      announce(`Cleaned: ${count} of ${entries.length}.` + (failed ? ` Failed: ${failed}; these files are excluded from downloads.` : ' Download files individually or together as a ZIP.'), failed > 0);
     } finally { busy = false; render(); }
   };
   $('downloadZip').onclick = async () => {
     if (busy) return;
-    busy = true; render(); announce('Готую ZIP із очищеними файлами…');
+    busy = true; render(); announce('Preparing a ZIP of your cleaned files…');
     try {
       const zip = new JSZip(), used = new Set();
       for (const entry of entries.filter(item => item.result)) {
@@ -101,8 +101,8 @@ export function mount(root) {
       const url = URL.createObjectURL(blob), link = document.createElement('a');
       link.href = url; link.download = 'metadata-cleaned.zip'; link.click();
       setTimeout(() => URL.revokeObjectURL(url), 60000);
-      announce(`ZIP створено: ${used.size} файлів · ${formatSize(blob.size)}.`);
-    } catch (error) { announce('Не вдалося створити ZIP: ' + error.message, true); }
+      announce(`ZIP created: ${used.size} file(s) · ${formatSize(blob.size)}.`);
+    } catch (error) { announce('Could not create ZIP: ' + error.message, true); }
     finally { busy = false; render(); }
   };
   render();
