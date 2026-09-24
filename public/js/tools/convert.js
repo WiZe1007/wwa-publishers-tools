@@ -5,7 +5,13 @@ export function mount(root) {
 const $ = id => root.querySelector('#' + CSS.escape(id));
 let files = [];       // {file, url}
 let converted = [];   // {name, blob}
-const metadata = mountQuickMetadata(root, () => files.map(item => item.file));
+let resultFiles = [], resultVersion = 0;
+const metadata = mountQuickMetadata(root, () => resultFiles, { generatedResults: true });
+function invalidateResults() {
+  resultVersion++; resultFiles = []; metadata.refresh();
+}
+$('controlFields').addEventListener('input', invalidateResults);
+$('controlFields').addEventListener('change', invalidateResults);
 
 const drop = $('drop'), input = $('input');
 drop.onclick = () => input.click();
@@ -23,7 +29,7 @@ function addFiles(list) {
 }
 
 function render() {
-  metadata.refresh();
+  invalidateResults();
   const box = $('thumbs');
   box.innerHTML = '';
   files.forEach((f, i) => {
@@ -83,6 +89,8 @@ function canvasToBMP(canvas) {
 }
 
 $('convertBtn').onclick = async () => {
+  invalidateResults();
+  const version = resultVersion;
   const st = $('status');
   const type = $('format').value;
   const q = $('quality').value / 100;
@@ -122,6 +130,10 @@ $('convertBtn').onclick = async () => {
       chip.innerHTML = `<span style="color:var(--red)">✕ ${f.file.name}</span>`;
       $('results').appendChild(chip);
     }
+  }
+  if (version === resultVersion) {
+    resultFiles = converted.map(result => new File([result.blob], result.name, { type: result.blob.type }));
+    metadata.refresh();
   }
   st.className = failed ? 'status err' : 'status ok';
   st.textContent = failed ? `Готово з помилками: ${converted.length} ок, ${failed} не вдалося` : `✓ Конвертовано: ${converted.length}. Натисніть на файл, щоб скачати.`;

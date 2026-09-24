@@ -4,16 +4,16 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-async function setup(files = [], clean = async file => file) {
+async function setup(files = [], clean = async file => file, options = {}) {
   const elements = Object.fromEntries(['cleanMetaBtn', 'cleanMetaStatus', 'cleanMetaDownload'].map(id => [id, {
     hidden: id === 'cleanMetaDownload',
     setAttribute(name, value) { this[name] = value; },
     removeAttribute(name) { delete this[name]; }
   }]));
-  const archived = [], revoked = [];
+  const archived = [], revoked = [], downloads = [];
   const context = vm.createContext({
-    setTimeout,
-    URL: { createObjectURL: () => 'blob:test', revokeObjectURL: url => revoked.push(url) },
+    setTimeout, File: globalThis.File || require('node:buffer').File,
+    URL: { createObjectURL: file => { downloads.push(file); return 'blob:test'; }, revokeObjectURL: url => revoked.push(url) },
     JSZip: class {
       file(name, file, options) { archived.push({ name, file, options }); }
       async generateAsync() { return {}; }
@@ -29,9 +29,28 @@ async function setup(files = [], clean = async file => file) {
   const module = new vm.SourceTextModule(source, { context });
   await module.link(() => dependencies); await module.evaluate();
   const state = { files };
-  const controller = module.namespace.mountQuickMetadata({ querySelector: selector => elements[selector.slice(1)] }, () => state.files);
-  return { elements, state, controller, archived, revoked };
+  const controller = module.namespace.mountQuickMetadata({ querySelector: selector => elements[selector.slice(1)] }, () => state.files, options);
+  return { elements, state, controller, archived, revoked, downloads };
 }
+
+test('generated results keep exact encoded bytes, dimensions/format and filename without re-encoding', async () => {
+  const File = globalThis.File || require('node:buffer').File;
+  for (const [name, type] of [['resized_1440x2560.png', 'image/png'], ['converted.jpg', 'image/jpeg'], ['converted.bmp', 'image/bmp'], ['merged.webp', 'image/webp']]) {
+    const output = new File([new Uint8Array([1, 2, 3, 4])], name, { type });
+    const t = await setup([], () => { throw new Error('Must not re-encode generated output'); }, { generatedResults: true });
+    assert.equal(t.elements.cleanMetaBtn.disabled, true);
+    t.state.files = [output]; t.controller.refresh();
+    await t.elements.cleanMetaBtn.onclick();
+    assert.equal(t.elements.cleanMetaDownload.hidden, false);
+    assert.equal(t.elements.cleanMetaDownload.download, name.replace(/(\.[^.]+)$/, '_clean$1'));
+    assert.deepEqual(Buffer.from(await t.downloads[0].arrayBuffer()), Buffer.from(await output.arrayBuffer()));
+    assert.equal(t.downloads[0].type, type);
+    assert.equal(t.downloads[0].lastModified, new Date('2020-01-01T00:00:00Z').getTime());
+    t.state.files = []; t.controller.refresh();
+    assert.equal(t.elements.cleanMetaBtn.disabled, true);
+    assert.equal(t.elements.cleanMetaDownload.hidden, true);
+  }
+});
 
 test('quick cleaner is disabled until files exist and does not replace source files', async () => {
   const t = await setup();

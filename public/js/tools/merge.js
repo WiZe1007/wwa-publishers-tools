@@ -4,7 +4,13 @@ import { mountQuickMetadata } from '../quick-metadata.js';
 export function mount(root) {
 const $ = id => root.querySelector('#' + CSS.escape(id));
 let items = []; // {file, url, img}
-const metadata = mountQuickMetadata(root, () => items.map(item => item.file));
+let resultFiles = [], resultVersion = 0;
+const metadata = mountQuickMetadata(root, () => resultFiles, { generatedResults: true });
+function invalidateResults() {
+  resultVersion++; resultFiles = []; metadata.refresh();
+}
+$('controlFields').addEventListener('input', invalidateResults);
+$('controlFields').addEventListener('change', invalidateResults);
 
 const drop = $('drop'), input = $('input');
 drop.onclick = () => input.click();
@@ -30,7 +36,7 @@ async function addFiles(list) {
 }
 
 function render() {
-  metadata.refresh();
+  invalidateResults();
   const box = $('thumbs');
   box.innerHTML = '';
   items.forEach((it, i) => {
@@ -128,12 +134,18 @@ $('previewBtn').onclick = () => {
 $('mergeBtn').onclick = () => {
   const st = $('status');
   if (items.length < 2) { st.className = 'status err'; st.textContent = 'Додайте мінімум 2 зображення.'; return; }
+  invalidateResults();
+  const version = resultVersion;
   const canvas = compose();
   $('previewBox').style.display = '';
   const type = $('format').value;
   const ext = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' }[type];
   canvas.toBlob(blob => {
     if (!blob) { st.className = 'status err'; st.textContent = 'Помилка створення зображення.'; return; }
+    if (version === resultVersion) {
+      resultFiles = [new File([blob], `merged.${ext}`, { type: blob.type })];
+      metadata.refresh();
+    }
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `merged.${ext}`;

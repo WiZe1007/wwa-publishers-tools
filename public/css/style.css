@@ -125,7 +125,8 @@ h3{font-size:14px;line-height:1.4;font-weight:550}
 .drop .big{display:none}
 .upload-note{margin:17px 0 0;color:#7c91b1;font-size:10px;text-align:center}
 .settings-help{font-size:11px;line-height:1.65;color:#9db1d4;margin:0 0 20px;padding:10px 12px;background:#1a2b4833;border-left:2px solid #5c7db7}
-.settings-panel:has(fieldset:not(:disabled)) .settings-help{display:none}
+.settings-panel:has(fieldset:not(:disabled)) .settings-help:not(#resultMetadata){display:none}
+#resultMetadata{margin:20px 0 0;overflow-wrap:anywhere}
 fieldset{border:0;margin:0;padding:0;min-width:0}
 fieldset:disabled{opacity:.72}
 .row{display:flex;align-items:center;flex-wrap:wrap;gap:16px}

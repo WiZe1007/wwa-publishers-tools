@@ -1,7 +1,8 @@
 import { FIXED_DATE, metadataKind, stripImageMetadata, stripVideoMetadata } from './metadata.js';
 
-// Clean a snapshot of source files without changing the host tool's state/results.
-export function mountQuickMetadata(root, getFiles) {
+// generatedResults is only for trusted canvas output, never uploaded originals.
+// Canvas has already discarded source tags, so preserve encoded pixels/format.
+export function mountQuickMetadata(root, getFiles, { generatedResults = false } = {}) {
   const button = root.querySelector('#cleanMetaBtn');
   const status = root.querySelector('#cleanMetaStatus');
   const download = root.querySelector('#cleanMetaDownload');
@@ -39,8 +40,10 @@ export function mountQuickMetadata(root, getFiles) {
         status.textContent = `Очищення метаданих: ${index + 1} із ${files.length}…`;
         try {
           const kind = metadataKind(file);
-          if (!kind) throw new Error('Для очищення підтримуються JPEG, PNG, WebP, MP4, MOV та M4V.');
-          const result = await (kind === 'image' ? stripImageMetadata(file) : stripVideoMetadata(file));
+          if (!generatedResults && !kind) throw new Error('Для очищення підтримуються JPEG, PNG, WebP, MP4, MOV та M4V.');
+          const result = generatedResults
+            ? new File([file], file.name, { type: file.type, lastModified: FIXED_DATE.getTime() })
+            : await (kind === 'image' ? stripImageMetadata(file) : stripVideoMetadata(file));
           const name = uniqueCleanName(result.name, names);
           cleaned.push({ name, file: result });
         } catch (error) { failures.push(`${file.name}: ${error.message || 'Не вдалося очистити файл.'}`); }
@@ -68,7 +71,7 @@ export function mountQuickMetadata(root, getFiles) {
         download.textContent = cleaned.length > 1 ? 'Скачати очищені файли ZIP' : 'Скачати очищений файл';
       }
       status.className = failures.length ? 'status err' : 'status ok';
-      status.textContent = `Очищено: ${cleaned.length} із ${files.length}. Оригінали не змінено.` +
+      status.textContent = `Очищено: ${cleaned.length} із ${files.length}.` + (generatedResults ? ' Розміри, формат і якість результату збережено.' : ' Оригінали не змінено.') +
         (failures.length ? ` Не включено до завантаження: ${failures.join(' · ')}` : ' Копії готові до скачування.');
     } catch (error) {
       clearResult(); status.className = 'status err';

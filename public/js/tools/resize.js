@@ -4,7 +4,13 @@ import { mountQuickMetadata } from '../quick-metadata.js';
 export function mount(root) {
 const $ = id => root.querySelector('#' + CSS.escape(id));
 let items = []; // {file, url, img}
-const metadata = mountQuickMetadata(root, () => items.map(item => item.file));
+let resultFiles = [], resultVersion = 0;
+const metadata = mountQuickMetadata(root, () => resultFiles, { generatedResults: true });
+function invalidateResults() {
+  resultVersion++; resultFiles = []; metadata.refresh();
+}
+$('controlFields').addEventListener('input', invalidateResults);
+$('controlFields').addEventListener('change', invalidateResults);
 
 const drop = $('drop'), input = $('input');
 drop.onclick = () => input.click();
@@ -32,7 +38,7 @@ async function addFiles(list) {
 }
 
 function render() {
-  metadata.refresh();
+  invalidateResults();
   const box = $('thumbs');
   box.innerHTML = '';
   items.forEach((it, i) => {
@@ -115,6 +121,8 @@ $('resizeBtn').onclick = async () => {
   }
 
   $('resizeBtn').disabled = true;
+  invalidateResults();
+  const version = resultVersion;
   $('results').innerHTML = '';
   const type = $('format').value, q = $('quality').value / 100;
   const out = [];
@@ -140,6 +148,10 @@ $('resizeBtn').onclick = async () => {
     }
   }
 
+  if (version === resultVersion) {
+    resultFiles = out.map(result => new File([result.blob], result.name, { type: result.blob.type }));
+    metadata.refresh();
+  }
   // Скачування: 1 файл — напряму, декілька — ZIP
   if (out.length === 1) {
     const a = document.createElement('a');

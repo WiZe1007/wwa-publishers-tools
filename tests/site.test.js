@@ -18,6 +18,9 @@ test('every tool offers metadata cleaning', () => {
   for (const page of ['resize', 'convert', 'merge']) {
     assert.match(read('js/tools/' + page + '.js'), /mountQuickMetadata/);
     assert.match(read(page + '.html'), /id="cleanMetaDownload"/);
+    assert.match(read('js/tools/' + page + '.js'), /mountQuickMetadata\(root, \(\) => resultFiles, \{ generatedResults: true \}\)/);
+    const html = read(page + '.html');
+    assert.ok(html.indexOf('id="resultMetadata"') > html.indexOf('</fieldset>'));
   }
 });
 

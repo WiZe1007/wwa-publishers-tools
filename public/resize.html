@@ -48,12 +48,6 @@
     </div>
     <input type="file" id="input" accept="image/*" multiple hidden>
     <div class="thumbs" id="thumbs"></div>
-    <div class="settings-help">
-      <button class="btn secondary" id="cleanMetaBtn" type="button" disabled>Очистити метадані</button>
-      <p class="hint">Очищені копії вихідних JPEG, PNG та WebP без зміни розмірів. Оригінали й налаштування інструмента не змінюються. JPEG/WebP повторно стискаються; кольори можуть змінитися. Анімовані файли не підтримуються.</p>
-      <p class="status" id="cleanMetaStatus" role="status" aria-live="polite"></p>
-      <a class="btn secondary" id="cleanMetaDownload" hidden>Скачати очищений файл</a>
-    </div>
     <p class="upload-note">Файли залишаються у вашому браузері</p>
   </section>
 
@@ -94,6 +88,12 @@
     </div>
     <div class="filelist" id="results"></div>
     </fieldset>
+    <div class="settings-help" id="resultMetadata">
+      <button class="btn secondary" id="cleanMetaBtn" type="button" disabled>Очистити метадані результату</button>
+      <p class="hint">Спочатку змініть розмір зображень. Очищення застосовується лише до готових файлів із новими розмірами. Розміри, формат і якість результату зберігаються — без повторного стиснення.</p>
+      <p class="status" id="cleanMetaStatus" role="status" aria-live="polite"></p>
+      <a class="btn secondary" id="cleanMetaDownload" hidden>Скачати очищений файл</a>
+    </div>
   </section>
   </div>
 </main>
