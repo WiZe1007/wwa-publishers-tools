@@ -1,7 +1,10 @@
+import { mountQuickMetadata } from '../quick-metadata.js';
+
 // Each tool owns its DOM and state, including while detached during navigation.
 export function mount(root) {
 const $ = id => root.querySelector('#' + CSS.escape(id));
 let items = []; // {file, url, img}
+const metadata = mountQuickMetadata(root, () => items.map(item => item.file));
 
 const drop = $('drop'), input = $('input');
 drop.onclick = () => input.click();
@@ -29,6 +32,7 @@ async function addFiles(list) {
 }
 
 function render() {
+  metadata.refresh();
   const box = $('thumbs');
   box.innerHTML = '';
   items.forEach((it, i) => {
@@ -161,4 +165,3 @@ $('resizeBtn').onclick = async () => {
 };
 
 }
-

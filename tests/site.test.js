@@ -10,6 +10,17 @@ const PUB = path.join(ROOT, 'public');
 const PAGES = ['index.html', 'zip.html', 'resize.html', 'convert.html', 'merge.html', 'metadata.html'];
 const read = (p) => fs.readFileSync(path.join(PUB, p), 'utf8');
 
+test('every tool offers metadata cleaning', () => {
+  for (const page of ['zip', 'resize', 'convert', 'merge']) {
+    assert.match(read(page + '.html'), /id="cleanMetaBtn"/);
+  }
+  assert.match(read('metadata.html'), /id="cleanBtn"/);
+  for (const page of ['resize', 'convert', 'merge']) {
+    assert.match(read('js/tools/' + page + '.js'), /mountQuickMetadata/);
+    assert.match(read(page + '.html'), /id="cleanMetaDownload"/);
+  }
+});
+
 test('Metadata navigation label uses English on every page', () => {
   for (const page of PAGES) assert.ok(read(page).includes('<span>Metadata</span>'));
 });
