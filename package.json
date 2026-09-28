@@ -8,9 +8,10 @@
     "test": "node --test --experimental-vm-modules \"tests/*.test.js\""
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "dependencies": {
+    "@orama/stemmers": "3.1.18",
     "express": "^4.19.2"
   }
 }

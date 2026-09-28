@@ -132,3 +132,7 @@ select option{background:#171b26}
 .metadata-page .status{overflow-wrap:anywhere}
 .metadata-page .drop[aria-disabled=true]{opacity:.55;cursor:wait}
 @media(max-width:1000px){.metadata-page .tool-grid,.localization-grid{grid-template-columns:1fr}}
+.language-results { display: grid; gap: 4px; max-height: 240px; overflow-y: auto; padding: 8px; margin: -8px 0 16px; border: 1px solid var(--border, #ffffff30); border-radius: 14px; background: var(--input-bg, #101b2bef); }
+.language-results[hidden] { display: none; }
+.language-results button { text-align: start; border: 0; border-radius: 8px; padding: 12px; color: inherit; background: transparent; cursor: pointer; font: inherit; }
+.language-results button:hover, .language-results button:focus-visible { background: #4489e33b; outline: 2px solid #559cff; outline-offset: -2px; }

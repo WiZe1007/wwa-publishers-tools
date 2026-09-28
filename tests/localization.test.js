@@ -39,7 +39,7 @@ test('screenshot regression: de 25/286 and el 11/286 cannot pass', () => {
   const result = check(spanishReport);
   const analysis = result.analyses.fullDescription;
   assert.equal(result.clean, false); assert.equal(analysis.totalWords, 286); assert.equal(analysis.maxAllowed, 7);
-  assert.deepEqual(analysis.spam, [
+  assert.deepEqual(analysis.spam.map(({ forms, ...item }) => item), [
     { word: 'de', count: 25, density: 8.74, removeCount: 18 },
     { word: 'el', count: 11, density: 3.85, removeCount: 4 }
   ]);
@@ -166,4 +166,43 @@ test('timeout aborts the AI request and frees the concurrency slot', async t => 
   }) });
   assert.equal((await post()).status, 504);
   assert.equal((await post()).status, 504);
+});
+
+test('repair starts from the current result, with aggregated forms and a regional instruction', async t => {
+  const source = require('./fixtures/spanish-listing');
+  const post = await fixture(t, { callClaude: async (content, { system }) => {
+    const payload = JSON.parse(content);
+    assert.equal(payload.candidate.fullDescription, source.fullDescription);
+    assert.deepEqual(payload.fieldsToRepair, ['fullDescription']);
+    assert.equal(payload.fullDescriptionCheck.wordsToReduce.find(item => item.word === 'el').forms.length, 4);
+    assert.match(system, /WORD FAMILIES/); assert.match(system, /Colombian/);
+    return JSON.stringify(source);
+  } });
+  const { data } = await post('', { ...source, mode: 'repair' });
+  assert.equal(data.ready, false); assert.equal(data.attempts, 5);
+});
+test('repair receives the latest candidate even when its score ties the best', async t => {
+  let calls = 0;
+  const post = await fixture(t, { callClaude: async content => {
+    const payload = JSON.parse(content);
+    calls++;
+    if (calls === 3) assert.equal(payload.candidate.fullDescription, 'timer timer');
+    return JSON.stringify({ ...clean, fullDescription: calls === 1 ? 'garden garden' : 'timer timer' });
+  } });
+  assert.equal((await post()).data.ready, false);
+});
+test('provider failure after a valid draft preserves it but never marks it ready', async t => {
+  let calls = 0;
+  const post = await fixture(t, { callClaude: async () => {
+    if (++calls > 1) throw new Error('private-provider-error');
+    return JSON.stringify({ ...clean, fullDescription: 'garden garden' });
+  } });
+  const { status, data } = await post();
+  assert.equal(status, 200); assert.equal(data.ready, false);
+  assert.equal(data.fullDescription, 'garden garden'); assert.ok(data.warning);
+  assert.ok(!JSON.stringify(data).includes('private-provider-error'));
+});
+test('invalid repair mode is rejected before calling AI', async t => {
+  const post = await fixture(t, { callClaude: () => assert.fail('No AI call') });
+  assert.equal((await post('', { ...clean, mode: 'anything' })).status, 400);
 });

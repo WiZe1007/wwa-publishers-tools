@@ -45,6 +45,7 @@
       <form id="localizeForm">
         <fieldset id="sourceFields">
           <label class="fld"><b>Пошук мови</b><input id="languageSearch" type="text" autocomplete="off" placeholder="Наприклад: японська, Spanish, pt-BR"></label>
+          <div id="languageResults" class="language-results" role="group" aria-label="Знайдені мови" hidden></div>
           <label class="fld"><b>Мова результату</b><select id="locale" required disabled><option value="">Завантаження мов…</option></select></label>
           <p id="languageCount" class="hint" role="status" aria-live="polite"></p>
           <label class="fld"><b>Назва додатку / гри</b><input id="sourceTitle" type="text" required maxlength="400" dir="auto" placeholder="Наприклад, Focus Garden"></label>
@@ -52,7 +53,7 @@
           <label class="fld"><b>Короткий опис</b><textarea id="sourceShort" required maxlength="1000" rows="3" dir="auto" placeholder="Коротко про головну користь додатку"></textarea></label>
           <label class="fld"><b>Повний опис</b><textarea id="sourceFull" required maxlength="24000" rows="12" dir="auto" placeholder="Вставте опис з функціями, перевагами та важливими умовами. Вихідна мова може бути будь-якою."></textarea></label>
           <p class="hint">Ліміти результату: назва — 30, короткий опис — 80, повний — 4000 символів. Ліміти вихідних текстів: 200 / 500 / 12 000.</p>
-          <p class="settings-help">«Адаптувати та перевірити» передає тексти на сервер та Anthropic. «Перевірити без AI» лише рахує повтори на сервері, без перекладу й AI-виклику. Не вставляйте конфіденційні дані. Тексти не зберігаються у локальному сховищі.</p>
+          <p class="settings-help">Адаптація та виправлення з AI передають тексти на сервер та Anthropic. «Перевірити без AI» лише рахує повтори на сервері, без перекладу й AI-виклику. Не вставляйте конфіденційні дані. Тексти не зберігаються у локальному сховищі.</p>
           <button class="btn" id="generate" type="submit" disabled>Адаптувати та перевірити</button>
           <button class="btn secondary" id="checkSource" type="button" disabled>Перевірити без AI</button>
         </fieldset>
@@ -72,15 +73,17 @@
         <p id="checkSummary" role="status" aria-live="polite"></p>
         <p id="checkMetrics" class="hint"></p>
         <ul id="checkIssues"></ul>
-        <details id="frequencyDetails"><summary>Повтори всіх слів у повному описі</summary><div class="localization-table-wrap"><table class="localization-table"><thead><tr><th scope="col">Слово</th><th scope="col">Разів</th><th scope="col">Частка</th><th scope="col">Зменшити на</th></tr></thead><tbody id="frequencyBody"></tbody></table></div></details>
+        <details id="frequencyDetails"><summary>Повтори всіх слів і словоформ у повному описі</summary><div class="localization-table-wrap"><table class="localization-table"><thead><tr><th scope="col">Слово / форми</th><th scope="col">Разів</th><th scope="col">Частка</th><th scope="col">Зменшити на</th></tr></thead><tbody id="frequencyBody"></tbody></table></div></details>
       </div>
       <div class="row localization-actions">
         <button class="btn secondary" id="checkResult" type="button" disabled>Перевірити правки</button>
+        <button class="btn secondary" id="repairResult" type="button" disabled>Виправити повтори з AI</button>
+        <button class="btn secondary" id="copyFull" type="button" disabled>Копіювати повний опис</button>
         <button class="btn secondary" id="copyResult" type="button" disabled>Копіювати все</button>
         <button class="btn" id="downloadResult" type="button" disabled>Завантажити .txt</button>
       </div>
       <p id="resultStatus" class="status" role="status" aria-live="polite"></p>
-      <p class="hint localization-disclaimer">У повному описі перевіряються всі слова, включно зі службовими (de, el, the тощо): повтори понад 2,5% позначаються як переспам. Одиничне вживання не є повтором. У назві та короткому описі перевіряються дублікати змістових слів. Для англійської об’єднуються деякі форми; для інших мов рахуються точні форми. Підрахунок може відрізнятися від зовнішніх сервісів через поділ тексту на слова та групування форм. Це не гарантія схвалення магазину чи позицій у пошуку. Перевірте природність і зміст перекладу перед публікацією.</p>
+      <p class="hint localization-disclaimer">Повний опис: усі слова, включно зі службовими, перевіряються за строгим внутрішнім порогом 2,5%. Форми зі спільною основою об’єднуються для 27 мов; для решти — точні повтори з урахуванням письма. Рядок таблиці показує, які форми були об’єднані. Це евристична перевірка, а не повний словник чи копія ASOMobile: можливі зайві об’єднання та пропущені нерегулярні форми. У коротких полях перевіряються дублікати змістових слів. Статус перевірки не гарантує відсутності зауважень у сторонньому сервісі. Перед публікацією перевірте зміст, природність і регіональну відповідність перекладу.</p>
     </section>
   </div>
 </main>

@@ -3,6 +3,14 @@ const sourceIds = ['sourceTitle', 'sourceShort', 'sourceFull'];
 const resultIds = ['resultTitle', 'resultShort', 'resultFull'];
 const countIds = ['titleCount', 'shortCount', 'fullCount'];
 const limits = [30, 80, 4000];
+export function matchingLanguages(languages, query) {
+  const normalize = text => text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[_()\-]/g, ' ');
+  const tokens = normalize(query.trim()).split(/\s+/).filter(Boolean);
+  return languages.filter(language => {
+    const haystack = normalize(`${language.label} ${language.searchLabel || ''} ${language.code}`);
+    return tokens.every(token => haystack.includes(token));
+  }).sort((a, b) => Number(normalize(b.code) === normalize(query.trim())) - Number(normalize(a.code) === normalize(query.trim())));
+}
 
 export function mount(root) {
   const $ = id => root.querySelector('#' + id);
@@ -34,9 +42,11 @@ export function mount(root) {
     $('checkSource').disabled = busy || !languages.length || !$('locale').value;
     $('cancelGeneration').hidden = !busy;
     $('checkResult').disabled = busy || !hasResult;
+    $('repairResult').disabled = busy || !hasResult;
     const ready = !busy && hasResult && checkedSnapshot === snapshot();
     $('copyResult').disabled = !ready;
     $('downloadResult').disabled = !ready;
+    $('copyFull').disabled = !ready;
     $('resultPanel').setAttribute('aria-busy', String(busy));
   }
   function counters() {
@@ -64,18 +74,19 @@ export function mount(root) {
     $('checkReport').hidden = false;
     $('checkReport').dataset.state = checks.clean ? 'clean' : 'warning';
     $('checkSummary').textContent = checks.clean
-      ? '✓ Ліміти дотримано. У повному описі перевірено всі слова, включно зі службовими; надмірних повторів не знайдено.'
+      ? '✓ Внутрішню перевірку пройдено. Перевищень за наведеними правилами не знайдено; це не гарантія оцінки стороннього сервісу.'
       : 'Потрібні правки: результат ще не пройшов перевірку.';
     $('checkIssues').replaceChildren(...checks.issues.map(issue => {
       const li = document.createElement('li'); li.textContent = issue; return li;
     }));
     $('frequencyDetails').hidden = false;
     const analysis = checks.analyses.fullDescription;
-    $('checkMetrics').textContent = `Слів: ${analysis.totalWords}. Поріг: ${checks.densityLimit}%. Максимум вживань одного слова: ${analysis.maxAllowed}. Слів із перевищенням: ${analysis.spam.length}.`;
+    $('checkMetrics').textContent = `Слів: ${analysis.totalWords}. Поріг: ${checks.densityLimit}%. Максимум на групу форм: ${analysis.maxAllowed}. Слів із перевищенням: ${analysis.spam.length}. ${analysis.grouping === 'stemmed' ? 'Перевіряються також групи словоформ.' : 'Для цієї мови перевіряються точні форми; морфологічне групування недоступне.'}`;
     $('frequencyBody').replaceChildren(...analysis.frequency.map(item => {
       const tr = document.createElement('tr');
       tr.dataset.spam = String(item.count > analysis.maxAllowed);
-      for (const value of [item.word, item.count, item.density + '%', Math.max(0, item.count - analysis.maxAllowed)]) {
+      const name = item.forms?.length > 1 ? `${item.word} (${item.forms.map(form => `${form.word} ×${form.count}`).join(', ')})` : item.word;
+      for (const value of [name, item.count, item.density + '%', Math.max(0, item.count - analysis.maxAllowed)]) {
         const td = document.createElement('td'); td.textContent = value; tr.append(td);
       }
       return tr;
@@ -89,11 +100,11 @@ export function mount(root) {
     if (hasResult && JSON.stringify(source()) !== sourceSnapshot)
       $('generationStatus').textContent = 'Джерело або мову змінено. Натисніть «Адаптувати та перевірити», щоб створити новий варіант. Поточний результат належить попередньому запиту.';
   });
-  $('localizeForm').addEventListener('submit', async event => {
-    event.preventDefault();
+  async function generate(repair = false) {
     if (busy) return;
-    const payload = source();
-    const currentSource = JSON.stringify(payload);
+    const payload = repair ? { ...result(), mode: 'repair',
+      preserveTitle: $('preserveTitle').checked && Array.from(result().title).length <= limits[0] } : source();
+    const currentSource = JSON.stringify(source());
     busy = true; controller = new AbortController();
     stale('Очікування нового результату…');
     $('generationStatus').textContent = 'Адаптуємо тексти й перевіряємо повтори. За потреби AI виконає додаткові правки — це може зайняти до 2,5 хвилин.';
@@ -111,14 +122,16 @@ export function mount(root) {
       $('resultEmpty').hidden = true;
       $('resultLocale').textContent = language?.label || resultLocale;
       renderCheck(data.checks);
-      $('generationStatus').textContent = data.ready
+      $('generationStatus').textContent = data.warning || (data.ready
         ? `Адаптовано: ${language?.label || resultLocale}. Спроб: ${data.attempts}. Перегляньте переклад перед публікацією.`
-        : `Після ${data.attempts} спроб залишились зауваження. Відредагуйте результат за звітом нижче та перевірте правки.`;
+        : `Після ${data.attempts} спроб залишились зауваження. Натисніть «Виправити повтори з AI» або відредагуйте результат за звітом і перевірте правки.`);
     } catch (error) {
       $('generationStatus').textContent = error.name === 'AbortError' ? 'Запит скасовано.' : error.message;
       if (hasResult) stale('Новий результат не отримано. Попередній текст збережено; перевірте його перед експортом.');
     } finally { busy = false; controller = null; buttons(); }
-  });
+  }
+  $('localizeForm').addEventListener('submit', event => { event.preventDefault(); return generate(); });
+  $('repairResult').onclick = () => hasResult && generate(true);
   $('cancelGeneration').onclick = () => controller?.abort();
   $('checkSource').onclick = async () => {
     if (busy || !$('localizeForm').reportValidity()) return;
@@ -159,6 +172,11 @@ export function mount(root) {
     try { await navigator.clipboard.writeText(exportText()); $('resultStatus').textContent = 'Скопійовано всі три поля.'; }
     catch { $('resultStatus').textContent = 'Браузер не дозволив копіювання. Виділіть текст вручну або завантажте .txt.'; }
   };
+  $('copyFull').onclick = async () => {
+    if (busy || checkedSnapshot !== snapshot()) return;
+    try { await navigator.clipboard.writeText(result().fullDescription); $('resultStatus').textContent = 'Повний опис скопійовано без заголовків і службових підписів — для перевірки в іншому аналізаторі.'; }
+    catch { $('resultStatus').textContent = 'Не вдалося скопіювати. Виділіть текст вручну.'; }
+  };
   $('downloadResult').onclick = () => {
     if (busy || checkedSnapshot !== snapshot()) return;
     const url = URL.createObjectURL(new Blob([exportText()], { type: 'text/plain;charset=utf-8' }));
@@ -168,21 +186,40 @@ export function mount(root) {
     $('resultStatus').textContent = 'Файл підготовлено до завантаження.';
   };
   function renderLanguages() {
-    const normalize = text => text.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase();
-    const query = normalize($('languageSearch').value.trim());
-    const matches = languages.filter(language => normalize(`${language.label} ${language.searchLabel || ''} ${language.code}`).includes(query));
-    const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = matches.length ? 'Оберіть мову' : 'Мову не знайдено';
-    $('locale').replaceChildren(placeholder, ...matches.map(language => {
-      const option = document.createElement('option'); option.value = language.code; option.textContent = language.label; return option;
+    const query = $('languageSearch').value.trim();
+    const matches = matchingLanguages(languages, query);
+    $('languageResults').hidden = !query || !matches.length;
+    $('languageResults').replaceChildren(...matches.map(language => {
+      const button = document.createElement('button'); button.type = 'button';
+      button.textContent = `${language.label} · ${language.code}`;
+      button.onclick = () => {
+        selectedLocale = language.code; $('locale').value = language.code;
+        $('languageSearch').value = ''; renderLanguages(); $('locale').focus();
+        if (hasResult) $('generationStatus').textContent = 'Мову джерела змінено. Наявний результат залишився попередньою мовою; для нового перекладу натисніть «Адаптувати та перевірити».';
+      };
+      return button;
     }));
-    $('locale').value = matches.some(language => language.code === selectedLocale) ? selectedLocale : '';
-    $('languageCount').textContent = `Доступно: ${matches.length} із ${languages.length} мов і регіональних варіантів.`;
+    $('languageCount').textContent = query ? (matches.length ? `Знайдено: ${matches.length}. Натисніть потрібну мову вище. Поточний вибір не змінено.` : 'Мову не знайдено. Спробуйте назву українською, російською, англійською або код мови. Поточний вибір збережено.') : `Доступно: ${languages.length} мов і регіональних варіантів.`;
     buttons();
   }
   $('languageSearch').addEventListener('input', renderLanguages);
+  $('languageSearch').addEventListener('keydown', event => {
+    if (event.key === 'Escape') { $('languageSearch').value = ''; renderLanguages(); }
+    if (event.key === 'Enter' || event.key === 'ArrowDown') {
+      event.preventDefault();
+      const results = $('languageResults').children;
+      if (results.length) $('languageResults').hidden = false;
+      if (event.key === 'Enter' && results.length === 1) results[0].click();
+      else results[0]?.focus();
+    }
+  });
   $('locale').addEventListener('change', () => { selectedLocale = $('locale').value; buttons(); });
   request('/languages').then(data => {
     languages = data.languages;
+    $('locale').replaceChildren(...languages.map(language => {
+      const option = document.createElement('option'); option.value = language.code; option.textContent = `${language.label} · ${language.code}`; return option;
+    }));
+    $('locale').value = selectedLocale;
     renderLanguages();
     $('locale').disabled = false;
     $('generationStatus').textContent = 'Готово до адаптації. Оберіть мову та заповніть усі три поля.';
