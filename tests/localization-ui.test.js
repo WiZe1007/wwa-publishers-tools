@@ -12,7 +12,7 @@ async function mount() {
   const elements = new Map();
   const element = () => ({ value: '', textContent: '', disabled: false, hidden: false,
     dataset: {}, children: [], listeners: {}, checked: false,
-    classList: { toggle() {} }, setAttribute() {}, remove() {}, click() { this.clicked = true; },
+    classList: { toggle() {} }, reportValidity() { return true; }, setAttribute() {}, remove() {}, click() { this.clicked = true; },
     addEventListener(name, handler) { this.listeners[name] = handler; },
     replaceChildren(...children) { this.children = children; }, append(child) { this.children.push(child); } });
   const $ = id => { if (!elements.has(id)) elements.set(id, element()); return elements.get(id); };
@@ -67,4 +67,33 @@ test('late manual-check response cannot validate text edited during the request'
   await pending;
   assert.equal($('downloadResult').disabled, true);
   assert.match($('checkSummary').textContent, /Текст змінено/);
+});
+
+test('language search supports Ukrainian names and locale codes without silently selecting another language', async () => {
+  const { $ } = await mount();
+  $('languageSearch').value = 'японська'; $('languageSearch').listeners.input();
+  assert.equal($('locale').children[1].value, 'ja');
+  assert.equal($('locale').value, ''); assert.equal($('generate').disabled, true);
+  $('locale').value = 'ja'; $('locale').listeners.change();
+  assert.equal($('generate').disabled, false);
+  $('languageSearch').value = ''; $('languageSearch').listeners.input();
+  assert.equal($('locale').value, 'ja'); assert.equal($('locale').children.length, 108);
+  $('languageSearch').value = 'pt-BR'; $('languageSearch').listeners.input();
+  assert.equal($('locale').children[1].value, 'pt-BR');
+  $('languageSearch').value = 'Spanish'; $('languageSearch').listeners.input();
+  assert.ok($('locale').children.slice(1).length >= 8);
+  assert.ok($('locale').children.slice(1).every(item => item.value.startsWith('es-')));
+  $('languageSearch').value = 'not-a-language'; $('languageSearch').listeners.input();
+  assert.equal($('locale').children.length, 1); assert.equal($('checkSource').disabled, true);
+});
+test('check without AI catches Spanish function-word spam and disables export', async () => {
+  const { $, state } = await mount();
+  state.respond = () => assert.fail('Checking must not call AI');
+  $('locale').value = 'es-MX'; $('sourceTitle').value = 'Prueba'; $('sourceShort').value = 'Planifica tu día';
+  $('sourceFull').value = 'de de de el el el prueba';
+  await $('checkSource').onclick();
+  assert.equal($('resultFull').value, $('sourceFull').value);
+  assert.equal($('downloadResult').disabled, true);
+  assert.match($('checkMetrics').textContent, /Слів із перевищенням: 2/);
+  assert.ok($('checkIssues').children.some(item => item.textContent.includes('de ×3')));
 });

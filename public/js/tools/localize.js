@@ -8,6 +8,7 @@ export function mount(root) {
   const $ = id => root.querySelector('#' + id);
   let languages = [], controller, busy = false, hasResult = false;
   let resultLocale = '', checkedSnapshot = '', sourceSnapshot = '';
+  let selectedLocale = 'en-US';
   let checkVersion = 0;
   const values = ids => Object.fromEntries(fields.map((field, index) => [field, $(ids[index]).value.trim()]));
   const source = () => ({ ...values(sourceIds), locale: $('locale').value, preserveTitle: $('preserveTitle').checked });
@@ -29,7 +30,8 @@ export function mount(root) {
   function buttons() {
     $('sourceFields').disabled = busy;
     $('resultFields').disabled = busy || !hasResult;
-    $('generate').disabled = busy || !languages.length;
+    $('generate').disabled = busy || !languages.length || !$('locale').value;
+    $('checkSource').disabled = busy || !languages.length || !$('locale').value;
     $('cancelGeneration').hidden = !busy;
     $('checkResult').disabled = busy || !hasResult;
     const ready = !busy && hasResult && checkedSnapshot === snapshot();
@@ -52,6 +54,7 @@ export function mount(root) {
     $('checkReport').dataset.state = 'warning';
     $('checkSummary').textContent = message;
     $('checkIssues').replaceChildren();
+    $('checkMetrics').textContent = '';
     $('frequencyDetails').hidden = true;
     $('resultStatus').textContent = '';
     buttons();
@@ -61,17 +64,18 @@ export function mount(root) {
     $('checkReport').hidden = false;
     $('checkReport').dataset.state = checks.clean ? 'clean' : 'warning';
     $('checkSummary').textContent = checks.clean
-      ? '✓ Ліміти дотримано. Надмірних повторів за правилами перевірки не знайдено.'
+      ? '✓ Ліміти дотримано. У повному описі перевірено всі слова, включно зі службовими; надмірних повторів не знайдено.'
       : 'Потрібні правки: результат ще не пройшов перевірку.';
     $('checkIssues').replaceChildren(...checks.issues.map(issue => {
       const li = document.createElement('li'); li.textContent = issue; return li;
     }));
     $('frequencyDetails').hidden = false;
     const analysis = checks.analyses.fullDescription;
+    $('checkMetrics').textContent = `Слів: ${analysis.totalWords}. Поріг: ${checks.densityLimit}%. Максимум вживань одного слова: ${analysis.maxAllowed}. Слів із перевищенням: ${analysis.spam.length}.`;
     $('frequencyBody').replaceChildren(...analysis.frequency.map(item => {
       const tr = document.createElement('tr');
       tr.dataset.spam = String(item.count > analysis.maxAllowed);
-      for (const value of [item.word, item.count, item.density + '%']) {
+      for (const value of [item.word, item.count, item.density + '%', Math.max(0, item.count - analysis.maxAllowed)]) {
         const td = document.createElement('td'); td.textContent = value; tr.append(td);
       }
       return tr;
@@ -116,6 +120,22 @@ export function mount(root) {
     } finally { busy = false; controller = null; buttons(); }
   });
   $('cancelGeneration').onclick = () => controller?.abort();
+  $('checkSource').onclick = async () => {
+    if (busy || !$('localizeForm').reportValidity()) return;
+    const payload = source();
+    busy = true; controller = new AbortController(); stale('Перевіряємо вихідний текст…');
+    $('generationStatus').textContent = 'Перевіряємо без перекладу та без AI-виклику…';
+    try {
+      const checks = await request('/check', payload, controller.signal);
+      resultLocale = payload.locale; sourceSnapshot = JSON.stringify(payload); hasResult = true;
+      const language = languages.find(item => item.code === resultLocale);
+      resultIds.forEach((id, index) => { $(id).value = payload[fields[index]]; $(id).lang = resultLocale; $(id).dir = language?.dir || 'auto'; });
+      $('resultEmpty').hidden = true; $('resultLocale').textContent = language?.label || resultLocale;
+      renderCheck(checks);
+      $('generationStatus').textContent = 'Вихідні тексти перевірено без AI та скопійовано праворуч без змін. Це перевірка повторів, не переклад.';
+    } catch (error) { $('generationStatus').textContent = error.name === 'AbortError' ? 'Перевірку скасовано.' : error.message; }
+    finally { busy = false; controller = null; buttons(); }
+  };
   $('checkResult').onclick = async () => {
     const version = ++checkVersion;
     const data = result();
@@ -147,11 +167,23 @@ export function mount(root) {
     setTimeout(() => URL.revokeObjectURL(url), 10000);
     $('resultStatus').textContent = 'Файл підготовлено до завантаження.';
   };
-  request('/languages').then(data => {
-    languages = data.languages;
-    $('locale').replaceChildren(...languages.map(language => {
+  function renderLanguages() {
+    const normalize = text => text.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase();
+    const query = normalize($('languageSearch').value.trim());
+    const matches = languages.filter(language => normalize(`${language.label} ${language.searchLabel || ''} ${language.code}`).includes(query));
+    const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = matches.length ? 'Оберіть мову' : 'Мову не знайдено';
+    $('locale').replaceChildren(placeholder, ...matches.map(language => {
       const option = document.createElement('option'); option.value = language.code; option.textContent = language.label; return option;
     }));
+    $('locale').value = matches.some(language => language.code === selectedLocale) ? selectedLocale : '';
+    $('languageCount').textContent = `Доступно: ${matches.length} із ${languages.length} мов і регіональних варіантів.`;
+    buttons();
+  }
+  $('languageSearch').addEventListener('input', renderLanguages);
+  $('locale').addEventListener('change', () => { selectedLocale = $('locale').value; buttons(); });
+  request('/languages').then(data => {
+    languages = data.languages;
+    renderLanguages();
     $('locale').disabled = false;
     $('generationStatus').textContent = 'Готово до адаптації. Оберіть мову та заповніть усі три поля.';
     buttons();

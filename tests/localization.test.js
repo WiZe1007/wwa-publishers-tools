@@ -5,12 +5,18 @@ const { createChecker, createLocalizationRouter, LANGUAGES, validate } = require
 const { normalize } = require('../server');
 
 const clean = { locale: 'en-US', title: 'Focus Garden', shortDescription: 'Plan your day with a quiet timer.',
-  fullDescription: 'Plan a focused session. Set a timer, choose a task and start working. Review completed sessions in your history. Take a break when you need one.' };
+  fullDescription: 'Choose tasks. Set timers. Start focused sessions. Review completed work. Take breaks when needed. Track progress offline without accounts, reminders, subscriptions or social features.' };
 const check = createChecker({ normalizeEnglish: normalize, englishStopWords: new Set('a the your you in and with when one'.split(' ')) });
 
-test('all 24 supported locales have a working segmenter', () => {
-  assert.equal(LANGUAGES.length, 24);
-  for (const language of LANGUAGES) assert.doesNotThrow(() => check({ ...clean, locale: language.code }));
+test('all 107 language/region options are unique and supported by the segmenter', () => {
+  assert.equal(LANGUAGES.length, 107);
+  assert.equal(new Set(LANGUAGES.map(language => language.code)).size, 107);
+  for (const language of LANGUAGES) {
+    assert.equal(Intl.Segmenter.supportedLocalesOf(language.code).length, 1);
+    assert.doesNotThrow(() => check({ ...clean, locale: language.code }));
+    assert.ok(language.searchLabel);
+  }
+  for (const locale of ['ar-SA', 'fa', 'he', 'ur', 'ps']) assert.equal(LANGUAGES.find(item => item.code === locale).dir, 'rtl');
 });
 test('short natural copy passes; singleton words are not spam', () => assert.equal(check(clean).clean, true));
 test('English variants are grouped and repeated title words flagged', () => {
@@ -19,9 +25,43 @@ test('English variants are grouped and repeated title words flagged', () => {
   assert.equal(result.analyses.fullDescription.spam[0].count, 4);
   assert.equal(result.analyses.title.spam[0].count, 2);
 });
-test('Ukrainian stopwords are excluded, not English-stemmed', () => {
+test('full description includes Ukrainian function words, while short fields exclude them', () => {
   const result = check({ locale: 'uk', title: 'Тихий сад', shortDescription: 'Плануйте день та відпочинок', fullDescription: 'Сад та сад і сад та робота.' });
-  assert.deepEqual(result.analyses.fullDescription.spam.map(item => item.word), ['сад']);
+  assert.deepEqual(result.analyses.fullDescription.spam.map(item => item.word), ['сад', 'та']);
+  assert.equal(check({ locale: 'uk', title: 'Тихий сад', shortDescription: 'Робота та відпочинок та навчання', fullDescription: 'Плануйте день.' }).clean, true);
+});
+
+// Reproduce the COUNTS in the screenshot, not its unavailable full text.
+const spanishReport = { locale: 'es-MX', title: 'Prueba', shortDescription: 'Planifica tu día.',
+  fullDescription: [...Array(25).fill('de'), ...Array(11).fill('el'), ...Array(7).fill('en'),
+    ...Array.from({ length: 243 }, (_, index) => `palabra${index}`)].join(' ') };
+test('screenshot regression: de 25/286 and el 11/286 cannot pass', () => {
+  const result = check(spanishReport);
+  const analysis = result.analyses.fullDescription;
+  assert.equal(result.clean, false); assert.equal(analysis.totalWords, 286); assert.equal(analysis.maxAllowed, 7);
+  assert.deepEqual(analysis.spam, [
+    { word: 'de', count: 25, density: 8.74, removeCount: 18 },
+    { word: 'el', count: 11, density: 3.85, removeCount: 4 }
+  ]);
+  assert.ok(analysis.frequency.some(item => item.word === 'en' && item.density === 2.45));
+});
+test('English function words are included without accidental stemming', () => {
+  const result = createChecker({ normalizeEnglish: normalize, englishStopWords: new Set(['the', 'was']) })({ ...clean,
+    fullDescription: 'the the the was was was' });
+  assert.deepEqual(result.analyses.fullDescription.spam.map(item => item.word), ['the', 'was']);
+});
+test('two repetitions above 2.5 percent are flagged, not hidden by a three-use exemption', () => {
+  const result = check({ ...clean, locale: 'es-MX', fullDescription: 'de de sol luna' });
+  assert.equal(result.clean, false); assert.equal(result.analyses.fullDescription.spam[0].removeCount, 1);
+});
+test('invisible split characters and full-width forms cannot hide duplicate keywords', () => {
+  const result = check({ ...clean, fullDescription: 'garden gar\u200bden gar\u00adden ｇａｒｄｅｎ' });
+  assert.equal(result.analyses.fullDescription.spam[0].count, 4);
+});
+test('numbers contribute to total word count, but are not keyword-frequency entries', () => {
+  const analysis = check({ ...clean, fullDescription: 'de de alpha 1 2 3 4' }).analyses.fullDescription;
+  assert.equal(analysis.totalWords, 7);
+  assert.deepEqual(analysis.frequency.map(item => item.word), ['de', 'alpha']);
 });
 test('Chinese is segmented without spaces; repeated keywords are visible', () => {
   const result = check({ locale: 'zh-CN', title: '专注花园', shortDescription: '安排每日任务', fullDescription: '游戏。游戏。游戏。游戏。' });
@@ -57,7 +97,7 @@ async function fixture(t, options = {}) {
 }
 test('language API and checking work without an AI key or external calls', async t => {
   const post = await fixture(t, { isConfigured: () => false, callClaude: () => assert.fail('AI must not be called') });
-  assert.equal((await post('/languages', null)).data.languages.length, 24);
+  assert.equal((await post('/languages', null)).data.languages.length, 107);
   assert.equal((await post('/check')).data.clean, true);
   assert.equal((await post()).status, 503);
   assert.equal((await post('', {})).status, 400);
@@ -87,7 +127,25 @@ test('unresolved spam is never marked ready and retries are bounded', async t =>
   let calls = 0;
   const post = await fixture(t, { callClaude: async () => { calls++; return JSON.stringify({ ...clean, title: 'garden garden' }); } });
   const { data } = await post();
-  assert.equal(calls, 3); assert.equal(data.ready, false); assert.equal(data.checks.clean, false);
+  assert.equal(calls, 5); assert.equal(data.ready, false); assert.equal(data.checks.clean, false);
+});
+test('Spanish function-word spam reaches repair and cannot produce ready:true', async t => {
+  let calls = 0;
+  const post = await fixture(t, { callClaude: async (content, { system }) => {
+    assert.match(system, /INCLUDING grammatical function words/);
+    const payload = JSON.parse(content);
+    if (calls++) {
+      assert.equal(payload.fullDescriptionCheck.maxAllowed, 7);
+      assert.equal(payload.fullDescriptionCheck.wordsToReduce[0].word, 'de');
+      assert.equal(payload.fullDescriptionCheck.wordsToReduce[0].removeCount, 18);
+    }
+    return JSON.stringify(spanishReport);
+  } });
+  const checked = await post('/check', spanishReport);
+  assert.equal(checked.data.clean, false);
+  const { data } = await post('', spanishReport);
+  assert.equal(calls, 5); assert.equal(data.ready, false);
+  assert.ok(data.checks.issues.some(issue => issue.includes('de ×25')));
 });
 test('preserve-title option enforces the original brand even if AI changes it', async t => {
   const post = await fixture(t);
