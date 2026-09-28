@@ -7,7 +7,7 @@ const { TONE_INSTRUCTIONS } = require('../server.js');
 
 const ROOT = path.join(__dirname, '..');
 const PUB = path.join(ROOT, 'public');
-const PAGES = ['index.html', 'zip.html', 'resize.html', 'convert.html', 'merge.html', 'metadata.html'];
+const PAGES = ['index.html', 'zip.html', 'resize.html', 'convert.html', 'merge.html', 'metadata.html', 'localize.html'];
 const read = (p) => fs.readFileSync(path.join(PUB, p), 'utf8');
 
 test('every tool offers metadata cleaning', () => {
@@ -26,6 +26,12 @@ test('every tool offers metadata cleaning', () => {
 
 test('Metadata navigation label uses English on every page', () => {
   for (const page of PAGES) assert.ok(read(page).includes('<span>Metadata</span>'));
+});
+
+test('Localize is reachable from every page and supports in-app navigation', () => {
+  for (const page of PAGES) assert.ok(read(page).includes('<span>Localize</span>'));
+  assert.match(read('js/navigation.js'), /localize: \(\) => import\('\.\/tools\/localize.js'\)/);
+  assert.match(read('localize.html'), /Anthropic/);
 });
 
 describe('Синтаксис JS', () => {

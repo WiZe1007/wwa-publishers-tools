@@ -17,7 +17,7 @@ const post = (p, body) => fetch(base + p, {
 });
 
 describe('Сторінки віддаються', () => {
-  for (const page of ['/', '/zip.html', '/resize.html', '/convert.html', '/merge.html', '/metadata.html']) {
+  for (const page of ['/', '/zip.html', '/resize.html', '/convert.html', '/merge.html', '/metadata.html', '/localize.html']) {
     test(page, async () => {
       const r = await get(page);
       assert.strictEqual(r.status, 200);

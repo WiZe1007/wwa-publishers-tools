@@ -259,9 +259,10 @@ const SIZE_INSTRUCTIONS = {
 };
 
 // Виклик Claude API
-async function callClaude(content) {
+async function callClaude(content, { system, signal } = {}) {
   const resp = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
+    signal,
     headers: {
       'x-api-key': API_KEY,
       'anthropic-version': '2023-06-01',
@@ -270,6 +271,7 @@ async function callClaude(content) {
     body: JSON.stringify({
       model: MODEL,
       max_tokens: 4000,
+      ...(system ? { system } : {}),
       messages: [{ role: 'user', content }]
     })
   });
@@ -286,6 +288,10 @@ function extractJSON(text) {
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   return JSON.parse(jsonMatch ? jsonMatch[0] : text);
 }
+
+app.use('/api/localize', require('./lib/localization').createLocalizationRouter({
+  callClaude, isConfigured: () => Boolean(API_KEY), normalizeEnglish: normalize, englishStopWords: STOP_WORDS
+}));
 
 // Виправлення переспаму в довільному (в т.ч. відредагованому вручну) тексті
 app.post('/api/fix-spam', async (req, res) => {

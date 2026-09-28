@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Localize — WWA Tools</title>
+<link rel="icon" type="image/png" href="img/wwa-logo.png">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/glass.css">
+<link rel="stylesheet" href="css/navigation.css">
+<script src="js/vendor/jszip.min.js" defer></script>
+<script src="js/lightbox.js" defer></script>
+<script type="module" src="js/ui.js"></script>
+
+</head>
+<body class="tool-page localize-page">
+<a class="skip-link" href="#main">Перейти до вмісту</a>
+<div class="app-shell">
+  <header class="workspace-header" id="app-navigation" aria-label="Основна навігація">
+    <a class="brand" href="index.html"><img src="img/wwa-logo.png" width="30" height="30" alt=""><span>WWA Tools</span></a>
+    <nav class="top-nav" id="primary-links">
+      <a href="index.html"><span>Огляд</span></a>
+      <a href="zip.html"><span>Release Package</span></a>
+      <a href="resize.html"><span>Resize</span></a>
+      <a href="convert.html"><span>Convert</span></a>
+      <a href="merge.html"><span>Merge</span></a>
+      <a href="metadata.html"><span>Metadata</span></a>
+      <a href="localize.html" class="active" aria-current="page"><span>Localize</span></a>
+    </nav>
+    <button type="button" class="ambient-toggle" aria-pressed="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 11 7-11 7V5Z"/></svg><span>Призупинити відеофон</span></button>
+    <button class="theme-toggle" type="button" aria-label="Увімкнути темну тему" aria-pressed="false" title="Темна тема"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.4 1.4m11.2 11.2L19 19M5 19l1.4-1.4M17.6 6.4 19 5"/></svg></button>
+    <button class="menu-button" type="button" aria-label="Відкрити меню" aria-expanded="false" aria-controls="primary-links"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+  </header>
+  <div class="app-main">
+    <header class="topbar">
+      <div class="breadcrumb"><a href="index.html">Workspace</a><span>/</span><span>Localize</span></div>
+      <span class="local-status"><i></i> AI-локалізація</span>
+    </header>
+<main id="main" class="container">
+  <h1>Локалізація ASO</h1>
+  <p class="subtitle">Назва й описи, які звучать природно обраною мовою. Адаптація під регіон, перевірка повторів та лімітів — в одному місці.</p>
+  <div class="tool-grid localization-grid">
+    <section class="card" aria-labelledby="sourceHeading">
+      <div class="panel-heading"><h2 id="sourceHeading">Вихідні тексти</h2><span class="file-count">01 / Джерело</span></div>
+      <form id="localizeForm">
+        <fieldset id="sourceFields">
+          <label class="fld"><b>Мова результату</b><select id="locale" required disabled><option value="">Завантаження мов…</option></select></label>
+          <label class="fld"><b>Назва додатку / гри</b><input id="sourceTitle" type="text" required maxlength="400" dir="auto" placeholder="Наприклад, Focus Garden"></label>
+          <label class="check localization-preserve"><input id="preserveTitle" type="checkbox"> Залишити назву без перекладу (бренд)</label>
+          <label class="fld"><b>Короткий опис</b><textarea id="sourceShort" required maxlength="1000" rows="3" dir="auto" placeholder="Коротко про головну користь додатку"></textarea></label>
+          <label class="fld"><b>Повний опис</b><textarea id="sourceFull" required maxlength="24000" rows="12" dir="auto" placeholder="Вставте опис з функціями, перевагами та важливими умовами. Вихідна мова може бути будь-якою."></textarea></label>
+          <p class="hint">Ліміти результату: назва — 30, короткий опис — 80, повний — 4000 символів. Ліміти вихідних текстів: 200 / 500 / 12 000.</p>
+          <p class="settings-help">Після натискання тексти передаються на сервер та Anthropic для AI-обробки. Не вставляйте конфіденційні дані. Ця сторінка не зберігає тексти у локальному сховищі.</p>
+          <button class="btn" id="generate" type="submit" disabled>Адаптувати та перевірити</button>
+        </fieldset>
+      </form>
+      <button class="btn secondary" id="cancelGeneration" type="button" hidden>Скасувати запит</button>
+      <p id="generationStatus" class="status" role="status" aria-live="polite">Завантаження налаштувань…</p>
+    </section>
+    <section class="card" aria-labelledby="resultHeading" id="resultPanel">
+      <div class="panel-heading"><h2 id="resultHeading">Результат</h2><span class="file-count" id="resultLocale">02 / Локалізація</span></div>
+      <p class="settings-help" id="resultEmpty">Вставте три вихідні тексти та оберіть мову. Тут з’явиться редагований результат і звіт перевірки.</p>
+      <fieldset id="resultFields" disabled>
+        <label class="fld"><b>Локалізована назва <span class="localization-count" id="titleCount">0 / 30</span></b><input type="text" id="resultTitle" dir="auto"></label>
+        <label class="fld"><b>Локалізований короткий опис <span class="localization-count" id="shortCount">0 / 80</span></b><textarea id="resultShort" rows="3" dir="auto"></textarea></label>
+        <label class="fld"><b>Локалізований повний опис <span class="localization-count" id="fullCount">0 / 4000</span></b><textarea id="resultFull" rows="12" dir="auto"></textarea></label>
+      </fieldset>
+      <div id="checkReport" class="localization-report" hidden>
+        <p id="checkSummary" role="status" aria-live="polite"></p>
+        <ul id="checkIssues"></ul>
+        <details id="frequencyDetails"><summary>Повтори у повному описі</summary><div class="localization-table-wrap"><table class="localization-table"><thead><tr><th scope="col">Слово</th><th scope="col">Разів</th><th scope="col">Частка</th></tr></thead><tbody id="frequencyBody"></tbody></table></div></details>
+      </div>
+      <div class="row localization-actions">
+        <button class="btn secondary" id="checkResult" type="button" disabled>Перевірити правки</button>
+        <button class="btn secondary" id="copyResult" type="button" disabled>Копіювати все</button>
+        <button class="btn" id="downloadResult" type="button" disabled>Завантажити .txt</button>
+      </div>
+      <p id="resultStatus" class="status" role="status" aria-live="polite"></p>
+      <p class="hint localization-disclaimer">Перевірка шукає повтори слів, а не гарантує схвалення магазину чи позиції в пошуку. У повному описі поріг — 2,5% і щонайменше 3 вживання; у назві та короткому описі — повтори змістових слів. Службові слова виключено. Для англійської об’єднуються деякі форми слів; для інших мов перевіряються точні форми. Перед публікацією перевірте зміст перекладу.</p>
+    </section>
+  </div>
+</main>
+<footer class="app-footer"><span>AI-локалізація: тексти передаються на сервер та Anthropic.</span><span>WWA Tools <i>•</i> Publishing workspace</span></footer>
+</div>
+</div>
+</body>
+</html>
