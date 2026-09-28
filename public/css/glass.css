@@ -113,6 +113,15 @@ select option{background:#171b26}
 .localization-report p{margin:0 0 10px}
 .localization-report ul{padding-inline-start:20px;font-size:12px;line-height:1.8}
 .localization-report summary{cursor:pointer;font-size:12px;color:var(--muted)}
+.localization-report #checkSummary{font-size:18px;font-weight:600;margin-bottom:8px}
+.localization-report .localization-fixes{list-style:none;padding:0;margin:16px 0;font-size:14px;line-height:1.65}
+.localization-fixes li+li{margin-top:12px;padding-top:12px;border-top:1px solid #94b5e824}
+.localization-report>.localization-actions{margin:16px 0 20px}
+.localization-report>details{padding-top:16px;border-top:1px solid #94b5e824}
+.localization-report>details>summary{font-size:14px;padding:4px 0}
+.localization-settings{margin:0 0 24px;color:var(--muted);font-size:14px}
+.localization-settings>summary{cursor:pointer;padding:8px 0}
+.localization-settings .fld{max-width:480px;margin:12px 0}
 .localization-table-wrap{overflow-x:auto}
 .localization-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:12px}
 .localization-table th,.localization-table td{text-align:start;padding:8px;border-bottom:1px solid #94b5e824}

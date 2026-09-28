@@ -3,6 +3,25 @@ const sourceIds = ['sourceTitle', 'sourceShort', 'sourceFull'];
 const resultIds = ['resultTitle', 'resultShort', 'resultFull'];
 const countIds = ['titleCount', 'shortCount', 'fullCount'];
 const limits = [30, 80, 4000];
+const fieldNames = { title: 'Назва', shortDescription: 'Короткий опис', fullDescription: 'Повний опис' };
+const plural = (count, one, few, many) => count % 100 >= 11 && count % 100 <= 14 ? many : count % 10 === 1 ? one : count % 10 >= 2 && count % 10 <= 4 ? few : many;
+
+// Plain-language actions for the main view; the complete report stays in details.
+export function simpleFixes(checks) {
+  const fixes = [];
+  for (const field of fields) {
+    const label = fieldNames[field], analysis = checks.analyses[field];
+    if (!checks.lengths[field]) fixes.push(`${label}: додайте текст.`);
+    else if (checks.lengths[field] > checks.limits[field]) fixes.push(`${label}: скоротіть на ${checks.lengths[field] - checks.limits[field]} символів.`);
+    for (const item of analysis.spam) fixes.push(`${label}: «${item.word}»${item.forms?.length > 1 ? ' та його форми' : ''} — ${item.count} ${plural(item.count, 'раз', 'рази', 'разів')}. Приберіть ${item.removeCount} ${plural(item.removeCount, 'зайвий повтор', 'зайві повтори', 'зайвих повторів')}.`);
+    for (const item of analysis.sentences || []) fixes.push(`${label}: речення «${item.text.length > 100 ? item.text.slice(0, 100) + '…' : item.text}» повторюється. Залиште один раз.`);
+    for (const item of analysis.phrases || []) if (item.excessive) fixes.push(`${label}: фраза «${item.text}» повторюється ${item.count} ${plural(item.count, 'раз', 'рази', 'разів')}. Перефразуйте частину речень.`);
+    if (checks.editor?.issues.some(item => item.field === field)) fixes.push(`${label}: AI знайшов неточності в мові або змісті. Натисніть «Виправити з AI» або перегляньте деталі.`);
+  }
+  if (checks.issues.some(issue => issue.includes('письма'))) fixes.push('Повний опис написано не обраною мовою. Перекладіть його ще раз.');
+  if (!checks.clean && !fixes.length) fixes.push('Перевірку не завершено. Спробуйте ще раз — ваш текст збережено.');
+  return fixes;
+}
 export function matchingLanguages(languages, query) {
   const normalize = text => text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[_()\-]/g, ' ');
   const tokens = normalize(query.trim()).split(/\s+/).filter(Boolean);
@@ -71,7 +90,8 @@ export function mount(root) {
     $('checkIssues').replaceChildren();
     $('checkMetrics').textContent = '';
     lastChecks = null;
-    $('editorSummary').textContent = 'AI-редактура поточної версії ще не підтверджена.';
+    $('editorSummary').textContent = '';
+    $('moreIssues').hidden = true;
     $('adviceDetails').hidden = true;
     $('frequencyDetails').hidden = true;
     $('resultStatus').textContent = '';
@@ -83,16 +103,25 @@ export function mount(root) {
     checkedSnapshot = checks.clean ? snapshot() : '';
     $('checkReport').hidden = false;
     $('checkReport').dataset.state = checks.clean ? 'clean' : 'warning';
-    $('checkSummary').textContent = checks.clean
-      ? `✓ Профіль «${checks.profile === 'natural' ? 'Природний текст' : 'Строгий'}»: обов’язкових правок немає.${checks.warnings?.length ? ' Перегляньте рекомендації нижче.' : ''}`
-      : 'Потрібні правки: результат ще не пройшов перевірку.';
-    $('checkIssues').replaceChildren(...checks.issues.map(issue => {
+    const fixes = simpleFixes(checks);
+    $('checkSummary').textContent = checks.clean ? '✓ Зайвих повторів не знайдено'
+      : Object.values(checks.analyses).some(item => item.spam.length || item.sentences?.length || item.phrases?.some(phrase => phrase.excessive))
+        ? 'Є зайві повтори' : 'Потрібні правки';
+    $('checkIssues').replaceChildren(...fixes.slice(0, 3).map(issue => {
       const li = document.createElement('li'); li.textContent = issue; return li;
     }));
-    $('editorSummary').textContent = checks.editor?.status === 'passed' ? 'AI-редактор завершив перевірку: конкретних проблем із мовою та збереженням фактів не виявлено.'
-      : checks.editor?.status === 'needs_revision' ? 'AI-редактор виявив проблеми зі змістом або мовою — дивіться зауваження.'
-      : checks.editor?.status === 'unavailable' ? 'AI-редактор не завершив перевірку. Це не підтвердження якості тексту.'
-      : 'AI-редактура не виконана для цієї версії. Кнопка «Покращити текст з AI» запускає її, якщо відповідну опцію увімкнено.';
+    $('checkIssues').hidden = !fixes.length;
+    $('moreIssues').hidden = fixes.length <= 3;
+    $('moreIssues').textContent = `Ще зауважень: ${fixes.length - 3}. Усі — у деталях нижче.`;
+    $('detailIssues').replaceChildren(...checks.issues.map(issue => {
+      const li = document.createElement('li'); li.textContent = issue; return li;
+    }));
+    $('editorSummary').textContent = (checks.profile === 'natural' ? 'Перевірено основні слова. ' : '') +
+      (checks.editor?.status === 'passed' ? 'AI також перевірив мову та зміст.'
+      : checks.editor?.status === 'needs_revision' ? 'Мову або зміст також потрібно покращити.'
+      : checks.editor?.status === 'unavailable' ? 'AI-перевірка мови не завершилась. Можна спробувати ще раз.'
+      : 'Перевірено лише повтори, не якість перекладу.') + (checks.warnings?.length ? ' Додаткові поради — у деталях.' : '');
+    $('repairResult').textContent = checks.clean ? 'Покращити з AI' : 'Виправити з AI';
     $('adviceDetails').hidden = !checks.warnings?.length;
     $('checkAdvice').replaceChildren(...(checks.warnings || []).map(message => { const li = document.createElement('li'); li.textContent = message; return li; }));
     renderAnalysis();
@@ -136,11 +165,11 @@ export function mount(root) {
   $('reportSearch').addEventListener('input', resetReport);
   $('reportMore').onclick = () => { reportLimit += 50; renderAnalysis(); };
   for (const id of resultIds) $(id).addEventListener('input', () => {
-    counters(); stale('Текст змінено. Натисніть «Перевірити правки» перед копіюванням або завантаженням.');
+    counters(); stale('Текст змінено. Натисніть «Перевірити ще раз».');
   });
   $('sourceFields').addEventListener('input', () => {
     if (hasResult && JSON.stringify(source()) !== sourceSnapshot)
-      $('generationStatus').textContent = 'Джерело або мову змінено. Натисніть «Адаптувати та перевірити», щоб створити новий варіант. Поточний результат належить попередньому запиту.';
+      $('generationStatus').textContent = 'Ви змінили текст або мову. Натисніть «Перекласти та перевірити», щоб оновити результат.';
   });
   async function generate(repair = false) {
     if (busy) return;
@@ -151,7 +180,7 @@ export function mount(root) {
     const currentSource = JSON.stringify(source());
     busy = true; controller = new AbortController();
     stale('Очікування нового результату…');
-    $('generationStatus').textContent = `Адаптуємо тексти й перевіряємо повтори.${payload.qualityReview ? ' Після цього AI-редактор перевірить мову та факти.' : ''} За потреби виконаємо додаткові правки — це може зайняти до 2,5 хвилин.`;
+    $('generationStatus').textContent = repair ? 'Виправляємо текст… Це може зайняти до 2,5 хвилин.' : 'Перекладаємо й перевіряємо… Це може зайняти до 2,5 хвилин.';
     try {
       const data = await request('', payload, controller.signal);
       resultLocale = data.locale;
@@ -166,9 +195,9 @@ export function mount(root) {
       $('resultEmpty').hidden = true;
       $('resultLocale').textContent = language?.label || resultLocale;
       renderCheck(data.checks);
-      $('generationStatus').textContent = data.warning || (data.ready
-        ? `Адаптовано: ${language?.label || resultLocale}. Спроб: ${data.attempts}. Перегляньте переклад перед публікацією.`
-        : `Після ${data.attempts} спроб залишились зауваження. Натисніть «Покращити текст з AI» або відредагуйте результат за звітом і перевірте правки.`);
+      $('generationStatus').textContent = data.warning ? 'Не всі правки завершено. Отриманий текст збережено праворуч.' : (data.ready
+        ? `Готово: ${language?.label || resultLocale}. Результат — праворуч.`
+        : 'Текст готовий, але потребує правок. Підказки — під результатом.');
     } catch (error) {
       $('generationStatus').textContent = error.name === 'AbortError' ? 'Запит скасовано.' : error.message;
       if (hasResult) stale('Новий результат не отримано. Попередній текст збережено; перевірте його перед експортом.');
@@ -189,7 +218,7 @@ export function mount(root) {
       resultIds.forEach((id, index) => { $(id).value = payload[fields[index]]; $(id).lang = resultLocale; $(id).dir = language?.dir || 'auto'; });
       $('resultEmpty').hidden = true; $('resultLocale').textContent = language?.label || resultLocale;
       renderCheck(checks);
-      $('generationStatus').textContent = 'Вихідні тексти перевірено без AI та скопійовано праворуч без змін. Це перевірка повторів, не переклад.';
+      $('generationStatus').textContent = 'Повтори перевірено. Текст праворуч залишився без змін.';
     } catch (error) { $('generationStatus').textContent = error.name === 'AbortError' ? 'Перевірку скасовано.' : error.message; }
     finally { busy = false; controller = null; buttons(); }
   };
@@ -208,7 +237,7 @@ export function mount(root) {
     finally { if (version === checkVersion) buttons(); }
   };
   $('checkProfile').addEventListener('change', () => {
-    $('profileHelp').textContent = profile() === 'natural' ? 'Змістові групи: до 4%, щонайменше 3 вживання у повному описі. Службові слова не блокують результат. Це не строгий режим.' : 'Усі групи, включно зі службовими: до 2,5%. На коротких текстах цей режим може вимагати неприродних правок — перевіряйте граматику.';
+    $('profileHelp').textContent = profile() === 'natural' ? 'Перевіряємо основні слова. Часті «і», «в», «на» та подібні слова не вважаємо проблемою.' : 'Перевіряємо всі слова, навіть «і», «в» та «на». Це суворіший режим.';
     if (hasResult) { stale('Профіль змінено. Перевіряємо текст за новими правилами…'); return $('checkResult').onclick(); }
   });
   const exportText = () => {
@@ -243,7 +272,7 @@ export function mount(root) {
       button.onclick = () => {
         selectedLocale = language.code; $('locale').value = language.code;
         $('languageSearch').value = ''; renderLanguages(); $('locale').focus();
-        if (hasResult) $('generationStatus').textContent = 'Мову джерела змінено. Наявний результат залишився попередньою мовою; для нового перекладу натисніть «Адаптувати та перевірити».';
+        if (hasResult) $('generationStatus').textContent = 'Мову змінено. Натисніть «Перекласти та перевірити», щоб оновити результат.';
       };
       return button;
     }));

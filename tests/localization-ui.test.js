@@ -48,7 +48,7 @@ test('manual edits invalidate ready state; checks block spam then allow repaired
   $('resultFull').value = 'minutnik minutnik minutnik minutnik'; $('resultFull').listeners.input();
   assert.equal($('downloadResult').disabled, true);
   await $('checkResult').onclick(); assert.equal($('copyResult').disabled, true);
-  assert.match($('checkSummary').textContent, /Потрібні правки/);
+  assert.match($('checkSummary').textContent, /Є зайві повтори/);
   $('resultFull').value = valid.fullDescription; $('resultFull').listeners.input();
   await $('checkResult').onclick(); assert.equal($('downloadResult').disabled, false);
 });
@@ -128,7 +128,8 @@ test('check without AI catches Spanish function-word spam and disables export', 
   assert.equal($('resultFull').value, $('sourceFull').value);
   assert.equal($('downloadResult').disabled, true);
   assert.match($('checkMetrics').textContent, /Слів із перевищенням: 2/);
-  assert.ok($('checkIssues').children.some(item => item.textContent.includes('de ×3')));
+  assert.ok($('checkIssues').children.some(item => item.textContent.includes('«de» — 3 рази. Приберіть 2 зайві повтори.')));
+  assert.ok($('detailIssues').children.some(item => item.textContent.includes('de ×3')));
 });
 
 test('switching profiles rechecks the same text without translation or stale export', async () => {
@@ -140,7 +141,7 @@ test('switching profiles rechecks the same text without translation or stale exp
   const pending = $('checkProfile').listeners.change();
   assert.equal($('copyFull').disabled, true);
   await pending; assert.equal($('copyFull').disabled, false);
-  assert.match($('checkSummary').textContent, /Природний/);
+  assert.match($('editorSummary').textContent, /Перевірено основні слова/);
   assert.match($('checkMetrics').textContent, /За строгим порогом/);
 });
 test('report switches fields and views, searches forms and shows empty results', async () => {
@@ -163,16 +164,16 @@ test('report switches fields and views, searches forms and shows empty results',
 test('manual changes invalidate AI editorial approval and repair retains the original source', async () => {
   const { $, state, generate } = await mount();
   state.respond = async () => ({ ...valid, checks: { ...check(valid), editor: { status: 'passed', issues: [] } }, ready: true, attempts: 1 });
-  await generate(); assert.match($('editorSummary').textContent, /завершив/);
+  await generate(); assert.match($('editorSummary').textContent, /AI також перевірив/);
   $('sourceFull').value = 'Changed unrelated source';
   $('resultFull').value = 'Now edited'; $('resultFull').listeners.input();
-  assert.match($('editorSummary').textContent, /ще не підтверджена/);
+  assert.equal($('editorSummary').textContent, '');
   state.respond = async body => {
     assert.equal(body.reference.fullDescription, valid.fullDescription);
     return { ...valid, checks: check(valid), ready: true, attempts: 1 };
   };
   await $('repairResult').onclick();
-  assert.match($('editorSummary').textContent, /не виконана/);
+  assert.match($('editorSummary').textContent, /Перевірено лише повтори/);
 });
 
 test('large reports paginate without hiding search matches beyond the first page', async () => {
@@ -189,4 +190,26 @@ test('large reports paginate without hiding search matches beyond the first page
   $('reportSearch').value = 'unique122'; $('reportSearch').listeners.input();
   assert.equal($('frequencyBody').children.length, 1);
   assert.match($('reportCount').textContent, /1 із 1/);
+});
+
+test('simple report limits visible advice but preserves every issue in details', async () => {
+  const { $ } = await mount();
+  $('sourceFull').value = 'alpha alpha beta beta gamma gamma delta delta epsilon epsilon';
+  await $('checkSource').onclick();
+  assert.equal($('checkIssues').children.length, 3);
+  assert.equal($('moreIssues').hidden, false);
+  assert.match($('moreIssues').textContent, /2/);
+  const shortAdvice = $('checkIssues').children.map(item => item.textContent).join(' ');
+  assert.doesNotMatch(shortAdvice, /%|щільність|профіль|словоформ/);
+  assert.match($('detailIssues').children.map(item => item.textContent).join(' '), /epsilon/);
+  assert.equal($('copyFull').disabled, true);
+});
+
+test('advanced report and settings are collapsed and main repair action precedes details', () => {
+  const html = fs.readFileSync('public/localize.html', 'utf8');
+  assert.match(html, /<details id="frequencyDetails"><summary>Деталі перевірки/);
+  assert.match(html, /<details class="localization-settings"><summary>/);
+  assert.ok(html.indexOf('id="repairResult"') < html.indexOf('id="frequencyDetails"'));
+  assert.ok(html.indexOf('id="frequencyDetails"') < html.indexOf('id="checkMetrics"'));
+  assert.equal((html.match(/id="repairResult"/g) || []).length, 1);
 });
