@@ -38,7 +38,11 @@
     </header>
 <main id="main" class="container">
   <h1>Локалізація ASO</h1>
-  <p class="subtitle">Назва й описи, які звучать природно обраною мовою. Адаптація під регіон, перевірка повторів та лімітів — в одному місці.</p>
+  <p class="subtitle">Від перекладу до готового тексту: слова, фрази, повторені речення та AI-редактура змісту.</p>
+  <section class="localization-profiles" aria-label="Налаштування аналізу">
+    <label class="fld"><b>Профіль перевірки</b><select id="checkProfile"><option value="strict" selected>Строгий — щільність усіх слів 2,5%</option><option value="natural">Природний текст — баланс мови й повторів</option></select></label>
+    <p class="hint" id="profileHelp">За замовчуванням перевіряються всі слова, включно з артиклями. Якщо щільність заважає природній граматиці, оберіть «Природний текст» — звіт збереже підрахунки та покаже різницю зі строгим профілем.</p>
+  </section>
   <div class="tool-grid localization-grid">
     <section class="card" aria-labelledby="sourceHeading">
       <div class="panel-heading"><h2 id="sourceHeading">Вихідні тексти</h2><span class="file-count">01 / Джерело</span></div>
@@ -50,6 +54,7 @@
           <p id="languageCount" class="hint" role="status" aria-live="polite"></p>
           <label class="fld"><b>Назва додатку / гри</b><input id="sourceTitle" type="text" required maxlength="400" dir="auto" placeholder="Наприклад, Focus Garden"></label>
           <label class="check localization-preserve"><input id="preserveTitle" type="checkbox"> Залишити назву без перекладу (бренд)</label>
+          <label class="check localization-preserve"><input id="qualityReview" type="checkbox" checked> AI-редактор: перевірити граматику, регіон і збереження фактів після адаптації</label>
           <label class="fld"><b>Короткий опис</b><textarea id="sourceShort" required maxlength="1000" rows="3" dir="auto" placeholder="Коротко про головну користь додатку"></textarea></label>
           <label class="fld"><b>Повний опис</b><textarea id="sourceFull" required maxlength="24000" rows="12" dir="auto" placeholder="Вставте опис з функціями, перевагами та важливими умовами. Вихідна мова може бути будь-якою."></textarea></label>
           <p class="hint">Ліміти результату: назва — 30, короткий опис — 80, повний — 4000 символів. Ліміти вихідних текстів: 200 / 500 / 12 000.</p>
@@ -71,19 +76,29 @@
       </fieldset>
       <div id="checkReport" class="localization-report" hidden>
         <p id="checkSummary" role="status" aria-live="polite"></p>
+        <p id="editorSummary" class="hint"></p>
+        <div class="localization-report-controls">
+          <label class="fld"><b>Поле</b><select id="reportField"><option value="fullDescription">Повний опис</option><option value="shortDescription">Короткий опис</option><option value="title">Назва</option></select></label>
+          <label class="fld"><b>Аналіз</b><select id="reportView"><option value="families">Групи словоформ</option><option value="exact">Точні слова</option><option value="phrases">Фрази · 2–4 слова</option><option value="sentences">Повторені речення</option></select></label>
+        </div>
         <p id="checkMetrics" class="hint"></p>
         <ul id="checkIssues"></ul>
-        <details id="frequencyDetails"><summary>Повтори всіх слів і словоформ у повному описі</summary><div class="localization-table-wrap"><table class="localization-table"><thead><tr><th scope="col">Слово / форми</th><th scope="col">Разів</th><th scope="col">Частка</th><th scope="col">Зменшити на</th></tr></thead><tbody id="frequencyBody"></tbody></table></div></details>
+        <details id="adviceDetails" hidden><summary>Рекомендації для редактора</summary><ul id="checkAdvice"></ul></details>
+        <details id="frequencyDetails" open><summary>Детальний звіт</summary>
+          <div class="localization-report-controls"><label class="fld"><b>Пошук у звіті</b><input id="reportSearch" type="search" placeholder="Слово або фраза"></label><label class="check"><input id="onlyIssues" type="checkbox"> Лише проблеми</label></div>
+          <div class="localization-table-wrap" role="region" aria-label="Таблиця повторів — прокручується горизонтально" tabindex="0"><table class="localization-table"><thead><tr><th scope="col" id="reportTermHeading">Слово / форми</th><th scope="col">Разів</th><th scope="col" id="reportDensityHeading">Частка</th><th scope="col">Тип</th><th scope="col" id="reportActionHeading">Зменшити на</th></tr></thead><tbody id="frequencyBody"></tbody></table></div><p id="reportEmpty" class="hint" hidden>За цими фільтрами повторів не знайдено.</p><p id="reportCount" class="hint"></p><button id="reportMore" type="button" class="btn secondary" hidden>Показати ще 50</button>
+        </details>
       </div>
       <div class="row localization-actions">
         <button class="btn secondary" id="checkResult" type="button" disabled>Перевірити правки</button>
-        <button class="btn secondary" id="repairResult" type="button" disabled>Виправити повтори з AI</button>
+        <button class="btn secondary" id="repairResult" type="button" disabled>Покращити текст з AI</button>
         <button class="btn secondary" id="copyFull" type="button" disabled>Копіювати повний опис</button>
         <button class="btn secondary" id="copyResult" type="button" disabled>Копіювати все</button>
         <button class="btn" id="downloadResult" type="button" disabled>Завантажити .txt</button>
       </div>
       <p id="resultStatus" class="status" role="status" aria-live="polite"></p>
-      <p class="hint localization-disclaimer">Повний опис: усі слова, включно зі службовими, перевіряються за строгим внутрішнім порогом 2,5%. Форми зі спільною основою об’єднуються для 27 мов; для решти — точні повтори з урахуванням письма. Рядок таблиці показує, які форми були об’єднані. Це евристична перевірка, а не повний словник чи копія ASOMobile: можливі зайві об’єднання та пропущені нерегулярні форми. У коротких полях перевіряються дублікати змістових слів. Статус перевірки не гарантує відсутності зауважень у сторонньому сервісі. Перед публікацією перевірте зміст, природність і регіональну відповідність перекладу.</p>
+      <p class="hint localization-disclaimer">Прозорий аналіз замість одного бала: бачте кожен повтор, його тип і причину зауваження. AI-редактор додатково перевіряє мову та факти.</p>
+      <details class="localization-method"><summary>Як працює перевірка</summary><p class="hint">Строгий профіль: максимум max(1, ⌊кількість слів × 2,5%⌋) для всіх груп. Природний: максимум max(3, ⌊кількість слів × 4%⌋) для змістових груп; службові слова не блокують результат. У коротких полях перевіряються дублікати змістових слів. Фрази з 2–4 слів показуються від 3 повторів, а 4+ повтори з покриттям від 12% позначаються проблемою. Дублі речень із 4+ слів теж потребують правок. Це редакторські критерії, не правила магазину. Групування словоформ приблизне; для мов без підтримки використовуються точні форми. AI може помилятися — перед публікацією підтвердьте факти. Звіт окремо показує, чи AI-редактор справді завершив перевірку.</p></details>
     </section>
   </div>
 </main>

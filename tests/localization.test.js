@@ -39,7 +39,7 @@ test('screenshot regression: de 25/286 and el 11/286 cannot pass', () => {
   const result = check(spanishReport);
   const analysis = result.analyses.fullDescription;
   assert.equal(result.clean, false); assert.equal(analysis.totalWords, 286); assert.equal(analysis.maxAllowed, 7);
-  assert.deepEqual(analysis.spam.map(({ forms, ...item }) => item), [
+  assert.deepEqual(analysis.spam.map(({ forms, kind, ...item }) => item), [
     { word: 'de', count: 25, density: 8.74, removeCount: 18 },
     { word: 'el', count: 11, density: 3.85, removeCount: 4 }
   ]);
@@ -189,7 +189,9 @@ test('repair receives the latest candidate even when its score ties the best', a
     if (calls === 3) assert.equal(payload.candidate.fullDescription, 'timer timer');
     return JSON.stringify({ ...clean, fullDescription: calls === 1 ? 'garden garden' : 'timer timer' });
   } });
-  assert.equal((await post()).data.ready, false);
+  const { data } = await post();
+  assert.equal(data.ready, false);
+  assert.equal(data.fullDescription, 'timer timer');
 });
 test('provider failure after a valid draft preserves it but never marks it ready', async t => {
   let calls = 0;
@@ -205,4 +207,70 @@ test('provider failure after a valid draft preserves it but never marks it ready
 test('invalid repair mode is rejected before calling AI', async t => {
   const post = await fixture(t, { callClaude: () => assert.fail('No AI call') });
   assert.equal((await post('', { ...clean, mode: 'anything' })).status, 400);
+});
+
+test('AI editor catches quality defects, then verifies the repaired candidate', async t => {
+  let drafts = 0, reviews = 0;
+  const post = await fixture(t, { callClaude: async (content, { system }) => {
+    const payload = JSON.parse(content);
+    if (system.includes('careful app-store copy editor')) {
+      reviews++;
+      return JSON.stringify({ issues: reviews === 1 ? [{ field: 'fullDescription', category: 'meaning', message: 'Пропущено уточнення.', quote: '', suggestion: 'Поверніть обмеження з джерела.' }] : [] });
+    }
+    if (++drafts === 2) {
+      assert.deepEqual(payload.fieldsToRepair, ['fullDescription']);
+      assert.equal(payload.editorFeedback[0].category, 'meaning');
+    }
+    return JSON.stringify(clean);
+  } });
+  const { data } = await post('', { ...clean, profile: 'natural', qualityReview: true });
+  assert.equal(drafts, 2); assert.equal(reviews, 2);
+  assert.equal(data.ready, true); assert.equal(data.checks.editor.status, 'passed');
+  assert.equal(data.profile, 'natural'); assert.equal(data.editorCalls, 2);
+});
+test('failed AI quality check cannot silently become a ready result', async t => {
+  const post = await fixture(t, { callClaude: async (content, { system }) => system.includes('careful app-store copy editor') ? '{}' : JSON.stringify(clean) });
+  const { data } = await post('', { ...clean, qualityReview: true });
+  assert.equal(data.ready, false); assert.equal(data.checks.clean, false);
+  assert.equal(data.checks.editor.status, 'unavailable'); assert.equal(data.fullDescription, clean.fullDescription);
+});
+test('AI editor and draft call budgets are bounded when criticism remains unresolved', async t => {
+  let drafts = 0, reviews = 0;
+  const post = await fixture(t, { callClaude: async (content, { system }) => {
+    if (system.includes('careful app-store copy editor')) { reviews++; return JSON.stringify({ issues: [{ field: 'fullDescription', category: 'grammar', message: 'Неприродне речення.', quote: 'Choose tasks.', suggestion: 'Перебудуйте речення.' }] }); }
+    drafts++; return JSON.stringify(clean);
+  } });
+  const { data } = await post('', { ...clean, qualityReview: true });
+  assert.ok(drafts <= 5); assert.equal(reviews, 2); assert.equal(data.ready, false);
+});
+test('repair editor uses the original reference, not a previously damaged candidate', async t => {
+  const reference = { ...clean, fullDescription: 'Offline only. No subscriptions.' };
+  const post = await fixture(t, { callClaude: async (content, { system }) => {
+    const payload = JSON.parse(content);
+    if (system.includes('careful app-store copy editor')) {
+      assert.equal(payload.referenceForFactsOnly.fullDescription, reference.fullDescription);
+      return '{"issues":[]}';
+    }
+    assert.equal(payload.originalReference.fullDescription, reference.fullDescription);
+    return JSON.stringify(clean);
+  } });
+  assert.equal((await post('', { ...clean, mode: 'repair', reference, qualityReview: true })).data.ready, true);
+});
+
+test('editor checks a spammy first draft and carries its feedback through density repairs', async t => {
+  let drafts = 0, reviews = 0;
+  const post = await fixture(t, { callClaude: async (content, { system }) => {
+    const payload = JSON.parse(content);
+    if (system.includes('careful app-store copy editor')) {
+      reviews++;
+      return JSON.stringify({ issues: [{ field: 'shortDescription', category: 'grammar', message: 'Помилка.', quote: '', suggestion: 'Виправте граматику.' }] });
+    }
+    if (++drafts > 1) {
+      assert.equal(payload.editorFeedback[0].category, 'grammar');
+      assert.ok(payload.fieldsToRepair.includes('shortDescription'));
+    }
+    return JSON.stringify({ ...clean, fullDescription: 'garden garden garden garden' });
+  } });
+  const { data } = await post('', { ...clean, qualityReview: true });
+  assert.equal(drafts, 5); assert.equal(reviews, 2); assert.equal(data.ready, false);
 });

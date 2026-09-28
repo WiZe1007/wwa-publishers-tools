@@ -18,9 +18,13 @@ export function mount(root) {
   let resultLocale = '', checkedSnapshot = '', sourceSnapshot = '';
   let selectedLocale = 'en-US';
   let checkVersion = 0;
+  let lastChecks = null;
+  let referenceSource = null;
+  let reportLimit = 50;
+  const profile = () => $('checkProfile').value || 'strict';
   const values = ids => Object.fromEntries(fields.map((field, index) => [field, $(ids[index]).value.trim()]));
-  const source = () => ({ ...values(sourceIds), locale: $('locale').value, preserveTitle: $('preserveTitle').checked });
-  const result = () => ({ ...values(resultIds), locale: resultLocale });
+  const source = () => ({ ...values(sourceIds), locale: $('locale').value, profile: profile(), qualityReview: $('qualityReview').checked, preserveTitle: $('preserveTitle').checked });
+  const result = () => ({ ...values(resultIds), locale: resultLocale, profile: profile() });
   const snapshot = () => JSON.stringify(result());
 
   async function request(path, body, signal) {
@@ -37,6 +41,7 @@ export function mount(root) {
   }
   function buttons() {
     $('sourceFields').disabled = busy;
+    $('checkProfile').disabled = busy;
     $('resultFields').disabled = busy || !hasResult;
     $('generate').disabled = busy || !languages.length || !$('locale').value;
     $('checkSource').disabled = busy || !languages.length || !$('locale').value;
@@ -65,34 +70,71 @@ export function mount(root) {
     $('checkSummary').textContent = message;
     $('checkIssues').replaceChildren();
     $('checkMetrics').textContent = '';
+    lastChecks = null;
+    $('editorSummary').textContent = 'AI-редактура поточної версії ще не підтверджена.';
+    $('adviceDetails').hidden = true;
     $('frequencyDetails').hidden = true;
     $('resultStatus').textContent = '';
     buttons();
   }
   function renderCheck(checks) {
+    lastChecks = checks;
+    reportLimit = 50;
     checkedSnapshot = checks.clean ? snapshot() : '';
     $('checkReport').hidden = false;
     $('checkReport').dataset.state = checks.clean ? 'clean' : 'warning';
     $('checkSummary').textContent = checks.clean
-      ? '✓ Внутрішню перевірку пройдено. Перевищень за наведеними правилами не знайдено; це не гарантія оцінки стороннього сервісу.'
+      ? `✓ Профіль «${checks.profile === 'natural' ? 'Природний текст' : 'Строгий'}»: обов’язкових правок немає.${checks.warnings?.length ? ' Перегляньте рекомендації нижче.' : ''}`
       : 'Потрібні правки: результат ще не пройшов перевірку.';
     $('checkIssues').replaceChildren(...checks.issues.map(issue => {
       const li = document.createElement('li'); li.textContent = issue; return li;
     }));
+    $('editorSummary').textContent = checks.editor?.status === 'passed' ? 'AI-редактор завершив перевірку: конкретних проблем із мовою та збереженням фактів не виявлено.'
+      : checks.editor?.status === 'needs_revision' ? 'AI-редактор виявив проблеми зі змістом або мовою — дивіться зауваження.'
+      : checks.editor?.status === 'unavailable' ? 'AI-редактор не завершив перевірку. Це не підтвердження якості тексту.'
+      : 'AI-редактура не виконана для цієї версії. Кнопка «Покращити текст з AI» запускає її, якщо відповідну опцію увімкнено.';
+    $('adviceDetails').hidden = !checks.warnings?.length;
+    $('checkAdvice').replaceChildren(...(checks.warnings || []).map(message => { const li = document.createElement('li'); li.textContent = message; return li; }));
+    renderAnalysis();
+    counters(); buttons();
+  }
+  function renderAnalysis() {
+    if (!lastChecks) return;
     $('frequencyDetails').hidden = false;
-    const analysis = checks.analyses.fullDescription;
-    $('checkMetrics').textContent = `Слів: ${analysis.totalWords}. Поріг: ${checks.densityLimit}%. Максимум на групу форм: ${analysis.maxAllowed}. Слів із перевищенням: ${analysis.spam.length}. ${analysis.grouping === 'stemmed' ? 'Перевіряються також групи словоформ.' : 'Для цієї мови перевіряються точні форми; морфологічне групування недоступне.'}`;
-    $('frequencyBody').replaceChildren(...analysis.frequency.map(item => {
+    const field = $('reportField').value || 'fullDescription', view = $('reportView').value || 'families';
+    const analysis = lastChecks.analyses[field];
+    const strictCount = analysis.frequency.filter(item => item.count > Math.max(1, Math.floor(analysis.totalWords * .025))).length;
+    $('checkMetrics').textContent = `Слів: ${analysis.totalWords}. ${field === 'fullDescription' ? `Поріг профілю: ${lastChecks.densityLimit}%.` : 'Коротке поле: перевірка дублікатів змістових слів.'} Максимум на групу форм: ${analysis.maxAllowed}. Слів із перевищенням: ${analysis.spam.length}. ${analysis.grouping === 'stemmed' ? 'Групування словоформ увімкнено.' : 'Для цієї мови — точні форми.'}${field === 'fullDescription' && lastChecks.profile === 'natural' ? ` За строгим порогом усіх слів: ${strictCount} груп із перевищенням (інший профіль).` : ''}`;
+    const rows = view === 'exact' ? analysis.exactFrequency : view === 'phrases' ? analysis.phrases : view === 'sentences' ? analysis.sentences : analysis.frequency;
+    $('reportTermHeading').textContent = view === 'phrases' ? 'Фраза' : view === 'sentences' ? 'Речення' : view === 'exact' ? 'Точне слово' : 'Слово / форми';
+    $('reportDensityHeading').textContent = view === 'phrases' ? 'Покриття' : 'Частка';
+    $('reportActionHeading').textContent = view === 'sentences' ? 'Зайві копії' : 'Зменшити на';
+    const normalize = value => value.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+    const query = normalize($('reportSearch').value.trim());
+    const filtered = (rows || []).map(item => {
+      const groupedIssue = analysis.spam.find(spam => view === 'exact' ? spam.forms.some(form => form.word === item.word) : spam.word === item.word);
+      const issue = view === 'sentences' || (view === 'phrases' ? item.excessive : Boolean(groupedIssue));
+      const name = item.text || (item.forms?.length > 1 ? `${item.word} (${item.forms.map(form => `${form.word} ×${form.count}`).join(', ')})` : item.word);
+      return { item, issue, name, groupedIssue };
+    }).filter(row => (!$('onlyIssues').checked || row.issue) && normalize(row.name).includes(query));
+    $('reportEmpty').hidden = Boolean(filtered.length);
+    $('reportCount').textContent = `Показано ${Math.min(reportLimit, filtered.length)} із ${filtered.length}. Пошук охоплює весь звіт.`;
+    $('reportMore').hidden = reportLimit >= filtered.length;
+    $('frequencyBody').replaceChildren(...filtered.slice(0, reportLimit).map(({ item, issue, name, groupedIssue }) => {
       const tr = document.createElement('tr');
-      tr.dataset.spam = String(item.count > analysis.maxAllowed);
-      const name = item.forms?.length > 1 ? `${item.word} (${item.forms.map(form => `${form.word} ×${form.count}`).join(', ')})` : item.word;
-      for (const value of [name, item.count, item.density + '%', Math.max(0, item.count - analysis.maxAllowed)]) {
+      tr.dataset.spam = String(issue);
+      const type = view === 'sentences' ? 'Дублікат' : view === 'phrases' ? (issue ? 'Частий шаблон' : 'Рекомендація') : item.kind === 'function' ? 'Службове' : item.kind === 'unknown' ? 'Не класифіковано' : 'Змістове';
+      const reduction = view === 'sentences' ? item.count - 1 : view === 'phrases' ? (issue ? 'Перефразувати' : '—') : groupedIssue ? (view === 'exact' && item.count <= analysis.maxAllowed ? 'У групі ↑' : groupedIssue.removeCount) : '—';
+      for (const value of [name, item.count, view === 'sentences' ? '—' : (item.coverage ?? item.density) + '%', type, reduction]) {
         const td = document.createElement('td'); td.textContent = value; tr.append(td);
       }
       return tr;
     }));
-    counters(); buttons();
   }
+  const resetReport = () => { reportLimit = 50; renderAnalysis(); };
+  for (const id of ['reportField', 'reportView', 'onlyIssues']) $(id).addEventListener('change', resetReport);
+  $('reportSearch').addEventListener('input', resetReport);
+  $('reportMore').onclick = () => { reportLimit += 50; renderAnalysis(); };
   for (const id of resultIds) $(id).addEventListener('input', () => {
     counters(); stale('Текст змінено. Натисніть «Перевірити правки» перед копіюванням або завантаженням.');
   });
@@ -103,15 +145,17 @@ export function mount(root) {
   async function generate(repair = false) {
     if (busy) return;
     const payload = repair ? { ...result(), mode: 'repair',
+      qualityReview: $('qualityReview').checked,
+      ...(referenceSource ? { reference: referenceSource } : {}),
       preserveTitle: $('preserveTitle').checked && Array.from(result().title).length <= limits[0] } : source();
     const currentSource = JSON.stringify(source());
     busy = true; controller = new AbortController();
     stale('Очікування нового результату…');
-    $('generationStatus').textContent = 'Адаптуємо тексти й перевіряємо повтори. За потреби AI виконає додаткові правки — це може зайняти до 2,5 хвилин.';
+    $('generationStatus').textContent = `Адаптуємо тексти й перевіряємо повтори.${payload.qualityReview ? ' Після цього AI-редактор перевірить мову та факти.' : ''} За потреби виконаємо додаткові правки — це може зайняти до 2,5 хвилин.`;
     try {
       const data = await request('', payload, controller.signal);
       resultLocale = data.locale;
-      sourceSnapshot = currentSource;
+      if (!repair) { sourceSnapshot = currentSource; referenceSource = payload; }
       const language = languages.find(item => item.code === resultLocale);
       resultIds.forEach((id, index) => {
         $(id).value = data[fields[index]];
@@ -124,7 +168,7 @@ export function mount(root) {
       renderCheck(data.checks);
       $('generationStatus').textContent = data.warning || (data.ready
         ? `Адаптовано: ${language?.label || resultLocale}. Спроб: ${data.attempts}. Перегляньте переклад перед публікацією.`
-        : `Після ${data.attempts} спроб залишились зауваження. Натисніть «Виправити повтори з AI» або відредагуйте результат за звітом і перевірте правки.`);
+        : `Після ${data.attempts} спроб залишились зауваження. Натисніть «Покращити текст з AI» або відредагуйте результат за звітом і перевірте правки.`);
     } catch (error) {
       $('generationStatus').textContent = error.name === 'AbortError' ? 'Запит скасовано.' : error.message;
       if (hasResult) stale('Новий результат не отримано. Попередній текст збережено; перевірте його перед експортом.');
@@ -140,7 +184,7 @@ export function mount(root) {
     $('generationStatus').textContent = 'Перевіряємо без перекладу та без AI-виклику…';
     try {
       const checks = await request('/check', payload, controller.signal);
-      resultLocale = payload.locale; sourceSnapshot = JSON.stringify(payload); hasResult = true;
+      resultLocale = payload.locale; sourceSnapshot = JSON.stringify(payload); referenceSource = payload; hasResult = true;
       const language = languages.find(item => item.code === resultLocale);
       resultIds.forEach((id, index) => { $(id).value = payload[fields[index]]; $(id).lang = resultLocale; $(id).dir = language?.dir || 'auto'; });
       $('resultEmpty').hidden = true; $('resultLocale').textContent = language?.label || resultLocale;
@@ -163,6 +207,10 @@ export function mount(root) {
     } catch (error) { if (version === checkVersion) $('resultStatus').textContent = error.message; }
     finally { if (version === checkVersion) buttons(); }
   };
+  $('checkProfile').addEventListener('change', () => {
+    $('profileHelp').textContent = profile() === 'natural' ? 'Змістові групи: до 4%, щонайменше 3 вживання у повному описі. Службові слова не блокують результат. Це не строгий режим.' : 'Усі групи, включно зі службовими: до 2,5%. На коротких текстах цей режим може вимагати неприродних правок — перевіряйте граматику.';
+    if (hasResult) { stale('Профіль змінено. Перевіряємо текст за новими правилами…'); return $('checkResult').onclick(); }
+  });
   const exportText = () => {
     const data = result();
     return `Language: ${resultLocale}\n\nTitle\n${data.title}\n\nShort description\n${data.shortDescription}\n\nFull description\n${data.fullDescription}\n`;

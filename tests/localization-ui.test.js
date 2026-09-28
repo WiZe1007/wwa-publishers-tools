@@ -130,3 +130,63 @@ test('check without AI catches Spanish function-word spam and disables export', 
   assert.match($('checkMetrics').textContent, /Слів із перевищенням: 2/);
   assert.ok($('checkIssues').children.some(item => item.textContent.includes('de ×3')));
 });
+
+test('switching profiles rechecks the same text without translation or stale export', async () => {
+  const { $, state } = await mount();
+  state.respond = () => assert.fail('Profile change must not invoke AI');
+  $('locale').value = 'es-MX'; $('sourceFull').value = 'el la los las';
+  await $('checkSource').onclick(); assert.equal($('copyFull').disabled, true);
+  $('checkProfile').value = 'natural';
+  const pending = $('checkProfile').listeners.change();
+  assert.equal($('copyFull').disabled, true);
+  await pending; assert.equal($('copyFull').disabled, false);
+  assert.match($('checkSummary').textContent, /Природний/);
+  assert.match($('checkMetrics').textContent, /За строгим порогом/);
+});
+test('report switches fields and views, searches forms and shows empty results', async () => {
+  const { $ } = await mount();
+  $('locale').value = 'es-MX'; $('sourceFull').value = 'el la los las símbolo símbolos';
+  await $('checkSource').onclick();
+  $('reportView').value = 'exact'; $('reportView').listeners.change();
+  assert.equal($('frequencyBody').children.length, 6);
+  $('reportSearch').value = 'simbolo'; $('reportSearch').listeners.input();
+  assert.equal($('frequencyBody').children.length, 2);
+  $('reportSearch').value = 'nonexistent'; $('reportSearch').listeners.input();
+  assert.equal($('reportEmpty').hidden, false);
+  $('reportSearch').value = ''; $('reportSearch').listeners.input();
+  $('reportField').value = 'title'; $('reportField').listeners.change();
+  assert.equal($('frequencyBody').children.length, 2);
+  $('reportField').value = 'fullDescription'; $('reportField').listeners.change();
+  $('reportView').value = 'sentences'; $('reportView').listeners.change();
+  assert.equal($('reportEmpty').hidden, false);
+});
+test('manual changes invalidate AI editorial approval and repair retains the original source', async () => {
+  const { $, state, generate } = await mount();
+  state.respond = async () => ({ ...valid, checks: { ...check(valid), editor: { status: 'passed', issues: [] } }, ready: true, attempts: 1 });
+  await generate(); assert.match($('editorSummary').textContent, /завершив/);
+  $('sourceFull').value = 'Changed unrelated source';
+  $('resultFull').value = 'Now edited'; $('resultFull').listeners.input();
+  assert.match($('editorSummary').textContent, /ще не підтверджена/);
+  state.respond = async body => {
+    assert.equal(body.reference.fullDescription, valid.fullDescription);
+    return { ...valid, checks: check(valid), ready: true, attempts: 1 };
+  };
+  await $('repairResult').onclick();
+  assert.match($('editorSummary').textContent, /не виконана/);
+});
+
+test('large reports paginate without hiding search matches beyond the first page', async () => {
+  const { $ } = await mount();
+  $('sourceFull').value = Array.from({ length: 123 }, (_, i) => `unique${i}`).join(' ');
+  await $('checkSource').onclick();
+  assert.equal($('frequencyBody').children.length, 50);
+  assert.equal($('reportMore').hidden, false);
+  $('reportMore').onclick();
+  assert.equal($('frequencyBody').children.length, 100);
+  $('reportMore').onclick();
+  assert.equal($('frequencyBody').children.length, 123);
+  assert.equal($('reportMore').hidden, true);
+  $('reportSearch').value = 'unique122'; $('reportSearch').listeners.input();
+  assert.equal($('frequencyBody').children.length, 1);
+  assert.match($('reportCount').textContent, /1 із 1/);
+});

@@ -40,7 +40,7 @@ h2,.card h2{font-size:20px;font-weight:500;letter-spacing:-.4px}
 .drop b{font-size:14px}.drop span:not(.big){color:var(--muted);font-size:12px}.drop small,.upload-note{color:var(--muted2);font-size:11px}
 .settings-help{border-left-color:#3296ff80;background:#3296ff08;color:var(--muted);font-size:12px}
 .fld b,.check{font-size:13px;line-height:1.5;font-weight:500;color:var(--muted)}
-input[type=text],input[type=email],input[type=url],input[type=number],textarea,select{min-height:48px;padding:12px 16px;border:1px solid #ffffff1a;border-radius:10px;background:var(--field);color:var(--ink);font-size:14px;box-shadow:none}
+input[type=text],input[type=search],input[type=email],input[type=url],input[type=number],textarea,select{min-height:48px;padding:12px 16px;border:1px solid #ffffff1a;border-radius:10px;background:var(--field);color:var(--ink);font-size:14px;box-shadow:none}
 input::placeholder,textarea::placeholder{color:var(--muted2);opacity:.9}
 input:focus,textarea:focus,select:focus{border-color:#3296ff99;box-shadow:0 0 0 3px #3296ff12}
 select option{background:#171b26}
@@ -136,3 +136,15 @@ select option{background:#171b26}
 .language-results[hidden] { display: none; }
 .language-results button { text-align: start; border: 0; border-radius: 8px; padding: 12px; color: inherit; background: transparent; cursor: pointer; font: inherit; }
 .language-results button:hover, .language-results button:focus-visible { background: #4489e33b; outline: 2px solid #559cff; outline-offset: -2px; }
+.localization-profiles{display:grid;grid-template-columns:minmax(260px,1fr) 1fr;gap:24px;align-items:center;border:1px solid var(--border,#ffffff30);border-radius:18px;padding:20px 24px;margin:24px 0;background:var(--input-bg,#101b2b66)}
+.localization-profiles .fld,.localization-profiles p{margin:0}
+.localization-report-controls{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:14px 0}
+.localization-report-controls .fld{flex:1 1 170px;margin:0;min-width:0}
+.localization-report-controls select,.localization-report-controls input[type=search]{width:100%;padding:12px}
+.localization-table td:first-child{min-width:130px;max-width:320px;overflow-wrap:anywhere;white-space:normal}
+.localization-table-wrap{max-height:420px;overflow:auto}
+.localization-table{min-width:560px}
+.localization-table th,.localization-table td{word-break:normal;overflow-wrap:normal}
+.localization-table td:first-child{overflow-wrap:anywhere}
+.localization-method summary,#adviceDetails summary{cursor:pointer;font-size:14px;color:var(--muted,#afbfce);margin:14px 0}
+@media(max-width:700px){.localization-profiles{grid-template-columns:1fr;gap:12px;padding:16px}.localization-table th,.localization-table td{padding:10px 8px}}
