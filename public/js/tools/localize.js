@@ -159,8 +159,10 @@ export function mount(root) {
     const analysis = lastChecks.analyses[field];
     const groupingHelp = analysis.grouping === 'stemmed' ? 'Групування словоформ увімкнено.'
       : analysis.grouping === 'contextual' ? 'Форми об’єднуються, коли базове слово теж є в тексті.' : 'Для цієї мови — точні форми.';
-    const strictCount = analysis.frequency.filter(item => item.count > Math.max(1, Math.floor(analysis.totalWords * .025))).length;
-    $('checkMetrics').textContent = `Слів: ${analysis.totalWords} (без окремих чисел). ${field === 'fullDescription' ? `Поріг профілю: ${lastChecks.densityLimit}%.` : 'Коротке поле: перевірка дублікатів змістових слів.'} Максимум на групу форм: ${analysis.maxAllowed}. Слів із перевищенням: ${analysis.spam.length}. ${groupingHelp}${field === 'fullDescription' && lastChecks.profile === 'natural' ? ` За строгим порогом усіх слів: ${strictCount} груп із перевищенням (інший профіль).` : ''}`;
+    const strictCount = analysis.frequency.filter(item => item.count > (analysis.budget?.strictMaxAllowed ?? analysis.maxAllowed)).length;
+    const budgetHelp = field === 'fullDescription' && lastChecks.profile === 'strict' && analysis.budget
+      ? `Ліміт враховує і кількість слів, і довжину тексту (${analysis.budget.characters} символів).` : '';
+    $('checkMetrics').textContent = `Слів: ${analysis.totalWords} (без окремих чисел). Максимум на слово або групу форм: ${analysis.maxAllowed}. ${budgetHelp} Слів із перевищенням: ${analysis.spam.length}. ${groupingHelp}${field === 'fullDescription' && lastChecks.profile === 'natural' ? ` За строгим порогом усіх слів: ${strictCount} груп із перевищенням (інший профіль).` : ''}`;
     const rows = view === 'exact' ? analysis.exactFrequency : view === 'phrases' ? analysis.phrases : view === 'sentences' ? analysis.sentences : analysis.frequency;
     $('reportTermHeading').textContent = view === 'phrases' ? 'Фраза' : view === 'sentences' ? 'Речення' : view === 'exact' ? 'Точне слово' : 'Слово / форми';
     $('reportDensityHeading').textContent = view === 'phrases' ? 'Покриття' : 'Частка';

@@ -111,7 +111,7 @@ test('HTTP checker detects native-script repetition in every offered locale with
     assert.equal(status, 200, code);
     assert.equal(data.clean, false, code);
     assert.ok(data.analyses.fullDescription.spam.length, code);
-    assert.equal(data.version, 'quality-v4');
+    assert.equal(data.version, 'quality-v5');
   }
 });
 test('successful generation checks every field and sends source as JSON data', async t => {
@@ -134,6 +134,30 @@ test('spam triggers repair with specific issues, then returns a clean candidate'
   } });
   const { data } = await post();
   assert.equal(data.ready, true); assert.equal(data.attempts, 2);
+});
+test('actual Urdu false negative triggers a bounded repair with character and shortening budgets', async t => {
+  const urdu = require('./fixtures/urdu-listing');
+  let calls = 0;
+  const post = await fixture(t, { callClaude: async (content, { system }) => {
+    const payload = JSON.parse(content);
+    if (calls++) {
+      assert.deepEqual(payload.fieldsToRepair, ['fullDescription']);
+      assert.equal(payload.fullDescriptionCheck.maxAllowed, 5);
+      assert.equal(payload.fullDescriptionCheck.characterMax, 5);
+      assert.equal(payload.fullDescriptionCheck.densityMax, 6);
+      assert.ok(payload.fullDescriptionCheck.repairTarget <= 5);
+      for (const word of ['میں', 'کا']) {
+        const issue = payload.fullDescriptionCheck.wordsToReduce.find(item => item.word === word);
+        assert.equal(issue.count, 6); assert.equal(issue.removeCount, 1);
+      }
+      assert.match(system, /Recompute BOTH limits on the final draft/);
+    }
+    return JSON.stringify(urdu);
+  } });
+  const { data } = await post('', urdu);
+  assert.equal(calls, 2); assert.equal(data.ready, false);
+  assert.equal(data.checks.clean, false); assert.equal(data.usage.calls, 2);
+  assert.equal(data.fullDescription, urdu.fullDescription);
 });
 test('unresolved spam is never marked ready and retries are bounded', async t => {
   let calls = 0;
