@@ -58,9 +58,9 @@ test('invisible split characters and full-width forms cannot hide duplicate keyw
   const result = check({ ...clean, fullDescription: 'garden gar\u200bden gar\u00adden ｇａｒｄｅｎ' });
   assert.equal(result.analyses.fullDescription.spam[0].count, 4);
 });
-test('numbers contribute to total word count, but are not keyword-frequency entries', () => {
+test('standalone numbers cannot dilute keyword density', () => {
   const analysis = check({ ...clean, fullDescription: 'de de alpha 1 2 3 4' }).analyses.fullDescription;
-  assert.equal(analysis.totalWords, 7);
+  assert.equal(analysis.totalWords, 3);
   assert.deepEqual(analysis.frequency.map(item => item.word), ['de', 'alpha']);
 });
 test('Chinese is segmented without spaces; repeated keywords are visible', () => {
@@ -101,6 +101,18 @@ test('language API and checking work without an AI key or external calls', async
   assert.equal((await post('/check')).data.clean, true);
   assert.equal((await post()).status, 503);
   assert.equal((await post('', {})).status, 400);
+});
+test('HTTP checker detects native-script repetition in every offered locale without Claude', async t => {
+  const words = require('./fixtures/native-keywords');
+  const post = await fixture(t, { isConfigured: () => false, callClaude: () => assert.fail('Repetition checks must not call AI') });
+  for (const { code } of LANGUAGES) {
+    const word = words[code] || words[code.split('-')[0]];
+    const { status, data } = await post('/check', { locale: code, title: word, shortDescription: word, fullDescription: Array(6).fill(word).join(' ') });
+    assert.equal(status, 200, code);
+    assert.equal(data.clean, false, code);
+    assert.ok(data.analyses.fullDescription.spam.length, code);
+    assert.equal(data.version, 'quality-v4');
+  }
 });
 test('successful generation checks every field and sends source as JSON data', async t => {
   const post = await fixture(t, { callClaude: async (content, options) => {

@@ -1,7 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { createChecker, LANGUAGES } = require('../lib/localization');
-const { STEMMERS } = require('../lib/word-families');
+const { STEMMERS, CONTEXTUAL } = require('../lib/word-families');
 const { normalize } = require('../server');
 const listing = require('./fixtures/spanish-listing');
 const check = createChecker({ normalizeEnglish: normalize });
@@ -30,13 +30,13 @@ for (const [locale, words] of [
 });
 for (const language of LANGUAGES) test(`analysis invariants and normalized repetition: ${language.code}`, () => {
   const analysis = analyze('Alpha alpha ALPHA delta 123', language.code);
-  assert.equal(analysis.totalWords, 5);
+  assert.equal(analysis.totalWords, 4);
   assert.equal(analysis.frequency.find(item => item.forms.some(form => form.word === 'alpha')).count, 3);
   for (const item of analysis.frequency) {
     assert.equal(item.count, item.forms.reduce((sum, form) => sum + form.count, 0));
     assert.ok(Number.isFinite(item.density));
   }
-  assert.equal(analysis.grouping, language.code.startsWith('en') || STEMMERS[language.code.split('-')[0]] ? 'stemmed' : 'exact');
+  assert.equal(analysis.grouping, STEMMERS[language.code.split('-')[0]] ? 'stemmed' : CONTEXTUAL.has(language.code.split('-')[0]) ? 'contextual' : 'exact');
 });
 test('density boundaries remain exact before display rounding', () => {
   for (const length of [39, 40, 79, 80, 119, 120, 256, 286, 400]) {
