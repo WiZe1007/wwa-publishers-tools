@@ -278,7 +278,7 @@ async function callClaude(content, { system, signal } = {}) {
   if (!resp.ok) {
     const errText = await resp.text();
     console.error('Anthropic API error:', resp.status, errText);
-    throw Object.assign(new Error(`Помилка Claude API (${resp.status}). Перевірте API ключ/модель.`), { api: true });
+    throw Object.assign(new Error(`Помилка Claude API (${resp.status}). Перевірте API ключ/модель.`), { api: true, status: resp.status });
   }
   const data = await resp.json();
   return (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');

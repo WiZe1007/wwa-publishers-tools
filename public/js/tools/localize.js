@@ -47,8 +47,14 @@ export function mount(root) {
   const snapshot = () => JSON.stringify(result());
 
   async function request(path, body, signal) {
-    const response = await fetch('/api/localize' + path, { ...(body ? { method: 'POST',
-      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}), signal });
+    let response;
+    try {
+      response = await fetch('/api/localize' + path, { ...(body ? { method: 'POST',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}), signal });
+    } catch (error) {
+      if (error.name === 'AbortError') throw error;
+      throw new Error('Немає зв’язку із сервером. Перевірте інтернет і спробуйте ще раз.');
+    }
     let data;
     try { data = await response.json(); }
     catch (error) {
@@ -97,12 +103,22 @@ export function mount(root) {
     $('resultStatus').textContent = '';
     buttons();
   }
+  function rememberResult() {
+    return { checks: lastChecks, snapshot: snapshot(), message: $('checkSummary').textContent };
+  }
+  function restoreResult(saved, message) {
+    if (!hasResult || saved.snapshot !== snapshot()) return;
+    if (saved.checks) renderCheck(saved.checks);
+    else stale(saved.message || 'Перевірте повтори перед завантаженням.');
+    $('resultNotice').hidden = false;
+    $('resultNotice').textContent = `${message} Попередній текст і його перевірку збережено.`;
+  }
   function renderCheck(checks) {
     lastChecks = checks;
     reportLimit = 50;
-    checkedSnapshot = checks.clean ? snapshot() : '';
+    checkedSnapshot = checks.clean && checks.editor?.status !== 'needs_revision' ? snapshot() : '';
     $('checkReport').hidden = false;
-    $('checkReport').dataset.state = checks.clean ? 'clean' : 'warning';
+    $('checkReport').dataset.state = checks.clean && !['unavailable', 'needs_revision'].includes(checks.editor?.status) ? 'clean' : 'warning';
     const fixes = simpleFixes(checks);
     $('checkSummary').textContent = checks.clean ? '✓ Зайвих повторів не знайдено'
       : Object.values(checks.analyses).some(item => item.spam.length || item.sentences?.length || item.phrases?.some(phrase => phrase.excessive))
@@ -113,15 +129,16 @@ export function mount(root) {
     $('checkIssues').hidden = !fixes.length;
     $('moreIssues').hidden = fixes.length <= 3;
     $('moreIssues').textContent = `Ще зауважень: ${fixes.length - 3}. Усі — у деталях нижче.`;
-    $('detailIssues').replaceChildren(...checks.issues.map(issue => {
+    const detailedIssues = [...checks.issues, ...(checks.editor?.issues || []).map(item => `${fieldNames[item.field]}: ${item.message} ${item.suggestion}`)];
+    $('detailIssues').replaceChildren(...detailedIssues.map(issue => {
       const li = document.createElement('li'); li.textContent = issue; return li;
     }));
     $('editorSummary').textContent = (checks.profile === 'natural' ? 'Перевірено основні слова. ' : '') +
       (checks.editor?.status === 'passed' ? 'AI також перевірив мову та зміст.'
       : checks.editor?.status === 'needs_revision' ? 'Мову або зміст також потрібно покращити.'
-      : checks.editor?.status === 'unavailable' ? 'AI-перевірка мови не завершилась. Можна спробувати ще раз.'
+      : checks.editor?.status === 'unavailable' ? `Мову не перевірено: ${checks.editor.message || 'AI не відповів.'} ${checks.clean ? 'Можна зберегти текст, але перед публікацією перечитайте переклад.' : 'Повтори перевірено окремо — підказки нижче.'}`
       : 'Перевірено лише повтори, не якість перекладу.') + (checks.warnings?.length ? ' Додаткові поради — у деталях.' : '');
-    $('repairResult').textContent = checks.clean ? 'Покращити з AI' : 'Виправити з AI';
+    $('repairResult').textContent = checks.editor?.status === 'unavailable' ? 'Повторити з AI' : checks.clean && checks.editor?.status !== 'needs_revision' ? 'Покращити з AI' : 'Виправити з AI';
     $('adviceDetails').hidden = !checks.warnings?.length;
     $('checkAdvice').replaceChildren(...(checks.warnings || []).map(message => { const li = document.createElement('li'); li.textContent = message; return li; }));
     renderAnalysis();
@@ -178,7 +195,9 @@ export function mount(root) {
       ...(referenceSource ? { reference: referenceSource } : {}),
       preserveTitle: $('preserveTitle').checked && Array.from(result().title).length <= limits[0] } : source();
     const currentSource = JSON.stringify(source());
+    const saved = rememberResult();
     busy = true; controller = new AbortController();
+    $('resultNotice').hidden = true;
     stale('Очікування нового результату…');
     $('generationStatus').textContent = repair ? 'Виправляємо текст… Це може зайняти до 2,5 хвилин.' : 'Перекладаємо й перевіряємо… Це може зайняти до 2,5 хвилин.';
     try {
@@ -195,12 +214,14 @@ export function mount(root) {
       $('resultEmpty').hidden = true;
       $('resultLocale').textContent = language?.label || resultLocale;
       renderCheck(data.checks);
+      if (data.warning) { $('resultNotice').hidden = false; $('resultNotice').textContent = data.warning; }
       $('generationStatus').textContent = data.warning ? 'Не всі правки завершено. Отриманий текст збережено праворуч.' : (data.ready
         ? `Готово: ${language?.label || resultLocale}. Результат — праворуч.`
+        : data.checks.clean && data.checks.editor?.status === 'unavailable' ? 'Переклад отримано. Повтори перевірено; AI-перевірка мови недоступна.'
         : 'Текст готовий, але потребує правок. Підказки — під результатом.');
     } catch (error) {
       $('generationStatus').textContent = error.name === 'AbortError' ? 'Запит скасовано.' : error.message;
-      if (hasResult) stale('Новий результат не отримано. Попередній текст збережено; перевірте його перед експортом.');
+      restoreResult(saved, error.name === 'AbortError' ? 'Нову спробу скасовано.' : $('generationStatus').textContent);
     } finally { busy = false; controller = null; buttons(); }
   }
   $('localizeForm').addEventListener('submit', event => { event.preventDefault(); return generate(); });
@@ -209,6 +230,8 @@ export function mount(root) {
   $('checkSource').onclick = async () => {
     if (busy || !$('localizeForm').reportValidity()) return;
     const payload = source();
+    const saved = rememberResult();
+    $('resultNotice').hidden = true;
     busy = true; controller = new AbortController(); stale('Перевіряємо вихідний текст…');
     $('generationStatus').textContent = 'Перевіряємо без перекладу та без AI-виклику…';
     try {
@@ -219,21 +242,29 @@ export function mount(root) {
       $('resultEmpty').hidden = true; $('resultLocale').textContent = language?.label || resultLocale;
       renderCheck(checks);
       $('generationStatus').textContent = 'Повтори перевірено. Текст праворуч залишився без змін.';
-    } catch (error) { $('generationStatus').textContent = error.name === 'AbortError' ? 'Перевірку скасовано.' : error.message; }
+    } catch (error) {
+      $('generationStatus').textContent = error.name === 'AbortError' ? 'Перевірку скасовано.' : error.message;
+      restoreResult(saved, $('generationStatus').textContent);
+    }
     finally { busy = false; controller = null; buttons(); }
   };
   $('checkResult').onclick = async () => {
     const version = ++checkVersion;
     const data = result();
+    const saved = rememberResult();
     $('checkResult').disabled = true;
     checkedSnapshot = ''; buttons(); $('checkResult').disabled = true;
     $('resultStatus').textContent = 'Перевіряємо правки…';
     try {
       const checks = await request('/check', data);
       if (version !== checkVersion) return;
+      // A repetition-only check cannot erase known editorial defects or approval.
+      if (saved.snapshot === snapshot() && saved.checks?.editor) checks.editor = saved.checks.editor;
       renderCheck(checks);
       $('resultStatus').textContent = '';
-    } catch (error) { if (version === checkVersion) $('resultStatus').textContent = error.message; }
+    } catch (error) {
+      if (version === checkVersion) { restoreResult(saved, error.message); $('resultStatus').textContent = error.message; }
+    }
     finally { if (version === checkVersion) buttons(); }
   };
   $('checkProfile').addEventListener('change', () => {

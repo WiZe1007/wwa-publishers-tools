@@ -221,7 +221,7 @@ test('AI editor catches quality defects, then verifies the repaired candidate', 
       assert.deepEqual(payload.fieldsToRepair, ['fullDescription']);
       assert.equal(payload.editorFeedback[0].category, 'meaning');
     }
-    return JSON.stringify(clean);
+    return JSON.stringify({ ...clean, fullDescription: drafts > 1 ? clean.fullDescription + ' Offline only.' : clean.fullDescription });
   } });
   const { data } = await post('', { ...clean, profile: 'natural', qualityReview: true });
   assert.equal(drafts, 2); assert.equal(reviews, 2);
@@ -231,7 +231,9 @@ test('AI editor catches quality defects, then verifies the repaired candidate', 
 test('failed AI quality check cannot silently become a ready result', async t => {
   const post = await fixture(t, { callClaude: async (content, { system }) => system.includes('careful app-store copy editor') ? '{}' : JSON.stringify(clean) });
   const { data } = await post('', { ...clean, qualityReview: true });
-  assert.equal(data.ready, false); assert.equal(data.checks.clean, false);
+  assert.equal(data.ready, false); assert.equal(data.checks.clean, true);
+  assert.deepEqual(data.checks.issues, []);
+  assert.equal(data.checks.editor.reason, 'invalid_response');
   assert.equal(data.checks.editor.status, 'unavailable'); assert.equal(data.fullDescription, clean.fullDescription);
 });
 test('AI editor and draft call budgets are bounded when criticism remains unresolved', async t => {
@@ -241,7 +243,8 @@ test('AI editor and draft call budgets are bounded when criticism remains unreso
     drafts++; return JSON.stringify(clean);
   } });
   const { data } = await post('', { ...clean, qualityReview: true });
-  assert.ok(drafts <= 5); assert.equal(reviews, 2); assert.equal(data.ready, false);
+  assert.equal(drafts, 2); assert.equal(reviews, 1); assert.equal(data.ready, false);
+  assert.equal(data.checks.editor.status, 'needs_revision');
 });
 test('repair editor uses the original reference, not a previously damaged candidate', async t => {
   const reference = { ...clean, fullDescription: 'Offline only. No subscriptions.' };
@@ -272,5 +275,66 @@ test('editor checks a spammy first draft and carries its feedback through densit
     return JSON.stringify({ ...clean, fullDescription: 'garden garden garden garden' });
   } });
   const { data } = await post('', { ...clean, qualityReview: true });
-  assert.equal(drafts, 5); assert.equal(reviews, 2); assert.equal(data.ready, false);
+  assert.equal(drafts, 2); assert.equal(reviews, 1); assert.equal(data.ready, false);
+});
+
+test('third distinct draft can receive editorial approval without a two-review ceiling', async t => {
+  let drafts = 0, reviews = 0;
+  const post = await fixture(t, { callClaude: async (content, { system }) => {
+    if (system.includes('careful app-store copy editor')) {
+      reviews++;
+      return JSON.stringify({ issues: reviews < 3 ? [{ field: 'fullDescription', category: 'grammar', message: 'Уточніть речення.', quote: '', suggestion: 'Перефразуйте.' }] : [] });
+    }
+    return JSON.stringify({ ...clean, fullDescription: clean.fullDescription + [' Discover gardens.', ' Explore forests.', ' Enjoy nature.'][drafts++] });
+  } });
+  const { data } = await post('', { ...clean, qualityReview: true });
+  assert.equal(data.ready, true); assert.equal(data.editorCalls, 3); assert.equal(drafts, 3);
+});
+
+for (const kind of ['malformed', 'network']) test(`one ${kind} failure automatically recovers`, async t => {
+  let calls = 0;
+  const post = await fixture(t, { callClaude: async () => {
+    if (++calls === 1) {
+      if (kind === 'malformed') return '{"title":';
+      throw new Error('temporary private network error');
+    }
+    return JSON.stringify(clean);
+  } });
+  const { data } = await post();
+  assert.equal(calls, 2); assert.equal(data.ready, true); assert.equal(data.attempts, 2);
+});
+
+for (const [status, code] of [[401, 'configuration'], [429, 'rate_limit']]) test(`provider ${status} has a distinct safe message and is not retried`, async t => {
+  let calls = 0;
+  const post = await fixture(t, { callClaude: async () => { calls++; throw Object.assign(new Error('private provider detail'), { status }); } });
+  const response = await post();
+  assert.equal(calls, 1); assert.equal(response.data.code, code);
+  assert.doesNotMatch(response.data.error, /private/);
+});
+
+test('a permanently malformed draft gets only one retry', async t => {
+  let calls = 0;
+  const post = await fixture(t, { callClaude: async () => { calls++; return '{}'; } });
+  const { status, data } = await post();
+  assert.equal(calls, 2); assert.equal(status, 502); assert.equal(data.code, 'invalid_response');
+});
+
+test('editor timeout preserves deterministic checks without claiming AI approval', async t => {
+  const post = await fixture(t, { timeoutMs: 20, callClaude: async (content, { system, signal }) => {
+    if (!system.includes('careful app-store copy editor')) return JSON.stringify(clean);
+    return new Promise((resolve, reject) => signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true }));
+  } });
+  const { data } = await post('', { ...clean, qualityReview: true });
+  assert.equal(data.ready, false); assert.equal(data.checks.clean, true);
+  assert.equal(data.checks.editor.reason, 'timeout');
+});
+
+test('incomplete editorial response is retried without generating the translation again', async t => {
+  let drafts = 0, reviews = 0;
+  const post = await fixture(t, { callClaude: async (content, { system }) => {
+    if (system.includes('careful app-store copy editor')) return ++reviews === 1 ? '{}' : '{"issues":[]}';
+    drafts++; return JSON.stringify(clean);
+  } });
+  const { data } = await post('', { ...clean, qualityReview: true });
+  assert.equal(drafts, 1); assert.equal(reviews, 2); assert.equal(data.ready, true);
 });

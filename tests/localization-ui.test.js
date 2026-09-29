@@ -52,13 +52,54 @@ test('manual edits invalidate ready state; checks block spam then allow repaired
   $('resultFull').value = valid.fullDescription; $('resultFull').listeners.input();
   await $('checkResult').onclick(); assert.equal($('downloadResult').disabled, false);
 });
-test('failure preserves previous text without claiming it is newly verified', async () => {
+test('failure preserves previous text and its existing verification and export', async () => {
   const { $, state, generate } = await mount(); await generate();
   state.respond = async () => { throw new Error('AI unavailable'); }; await generate();
   assert.equal($('resultFull').value, valid.fullDescription);
-  assert.equal($('downloadResult').disabled, true);
+  assert.equal($('downloadResult').disabled, false);
+  assert.match($('checkSummary').textContent, /Зайвих повторів не знайдено/);
+  assert.match($('resultNotice').textContent, /Попередній текст і його перевірку збережено/);
   assert.equal($('sourceFields').disabled, false);
   assert.match($('generationStatus').textContent, /некоректну відповідь/);
+});
+test('failed regeneration never enables export for manually edited unverified text', async () => {
+  const { $, state, generate } = await mount(); await generate();
+  $('resultFull').value = 'edited edited'; $('resultFull').listeners.input();
+  state.respond = async () => { throw new Error('unavailable'); }; await generate();
+  assert.equal($('downloadResult').disabled, true);
+  assert.match($('checkSummary').textContent, /Текст змінено/);
+});
+test('cancelled attempt restores the previous verified result', async () => {
+  const { $, state, generate } = await mount(); await generate();
+  state.respond = async () => { throw Object.assign(new Error('cancelled'), { name: 'AbortError' }); };
+  await generate();
+  assert.equal($('downloadResult').disabled, false);
+  assert.match($('resultNotice').textContent, /скасовано/);
+  assert.equal($('cancelGeneration').hidden, true);
+});
+test('unavailable AI review stays separate from clean repetitions and allows clearly warned export', async () => {
+  const { $, state, generate } = await mount();
+  state.respond = async () => ({ ...valid, checks: { ...check(valid), editor: { status: 'unavailable', issues: [] } }, ready: false });
+  await generate();
+  assert.equal($('downloadResult').disabled, false);
+  assert.equal($('checkReport').dataset.state, 'warning');
+  assert.match($('checkSummary').textContent, /Зайвих повторів не знайдено/);
+  assert.match($('editorSummary').textContent, /Мову не перевірено/);
+  assert.match($('editorSummary').textContent, /перед публікацією перечитайте/);
+  assert.equal($('repairResult').textContent, 'Повторити з AI');
+});
+test('known editorial defects stay visible and cannot be cleared by repetition-only recheck', async () => {
+  const { $, state, generate } = await mount();
+  state.respond = async () => ({ ...valid, checks: { ...check(valid), editor: { status: 'needs_revision', issues: [
+    { field: 'fullDescription', message: 'Пропущено обмеження.', suggestion: 'Поверніть уточнення.' }
+  ] } }, ready: false });
+  await generate();
+  await $('checkResult').onclick();
+  assert.equal($('downloadResult').disabled, true);
+  assert.match($('detailIssues').children.map(item => item.textContent).join(' '), /Пропущено обмеження/);
+  state.respond = async () => { throw new Error('failure'); }; await generate();
+  assert.equal($('downloadResult').disabled, true);
+  assert.match($('editorSummary').textContent, /потрібно покращити/);
 });
 test('late manual-check response cannot validate text edited during the request', async () => {
   const { $, generate } = await mount(); await generate();
