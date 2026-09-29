@@ -254,3 +254,23 @@ test('advanced report and settings are collapsed and main repair action precedes
   assert.ok(html.indexOf('id="frequencyDetails"') < html.indexOf('id="checkMetrics"'));
   assert.equal((html.match(/id="repairResult"/g) || []).length, 1);
 });
+
+test('costly editorial review is opt-in and spending limits are visible before submitting', () => {
+  const html = fs.readFileSync('public/localize.html', 'utf8');
+  assert.doesNotMatch(html.match(/<input id="qualityReview"[^>]*>/)[0], /\bchecked\b/);
+  assert.match(html, /до 2 AI-запитів/);
+  assert.match(html, /платні запити/);
+});
+
+test('actual request and token usage is displayed; repetition-only checks cost no AI calls', async () => {
+  const { $, state, generate } = await mount();
+  state.respond = async body => {
+    assert.equal(body.qualityReview, false);
+    return { ...valid, checks: check(valid), ready: true, usage: { calls: 1, limit: 2, reportedCalls: 1, inputTokens: 500, outputTokens: 100 } };
+  };
+  await generate();
+  assert.match($('usageStatus').textContent, /1 із максимум 2/);
+  assert.match($('usageStatus').textContent, /500 вхідних \/ 100 вихідних/);
+  await $('checkResult').onclick();
+  assert.match($('usageStatus').textContent, /0 AI-запитів/);
+});

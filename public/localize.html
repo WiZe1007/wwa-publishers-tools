@@ -54,7 +54,8 @@
           <p id="languageCount" class="hint" role="status" aria-live="polite"></p>
           <label class="fld"><b>Назва додатку / гри</b><input id="sourceTitle" type="text" required maxlength="400" dir="auto" placeholder="Наприклад, Focus Garden"></label>
           <label class="check localization-preserve"><input id="preserveTitle" type="checkbox"> Залишити назву без перекладу (бренд)</label>
-          <label class="check localization-preserve"><input id="qualityReview" type="checkbox" checked> Додатково перевірити мову та зміст з AI</label>
+          <label class="check localization-preserve"><input id="qualityReview" type="checkbox" aria-describedby="aiBudgetHelp"> Додаткова AI-перевірка мови (платні запити)</label>
+          <p id="aiBudgetHelp" class="hint">Економний режим: до 2 AI-запитів на переклад із виправленням. З додатковою AI-перевіркою — до 4. Перевірка повторів не використовує Claude API.</p>
           <label class="fld"><b>Короткий опис</b><textarea id="sourceShort" required maxlength="1000" rows="3" dir="auto" placeholder="Коротко про головну користь додатку"></textarea></label>
           <label class="fld"><b>Повний опис</b><textarea id="sourceFull" required maxlength="24000" rows="12" dir="auto" placeholder="Вставте опис з функціями, перевагами та важливими умовами. Вихідна мова може бути будь-якою."></textarea></label>
           <p class="hint">У результаті: назва до 30, короткий опис до 80, повний — до 4000 символів.</p>
@@ -65,6 +66,7 @@
       </form>
       <button class="btn secondary" id="cancelGeneration" type="button" hidden>Скасувати запит</button>
       <p id="generationStatus" class="status" role="status" aria-live="polite">Завантаження налаштувань…</p>
+      <p id="usageStatus" class="hint" role="status" hidden></p>
     </section>
     <section class="card" aria-labelledby="resultHeading" id="resultPanel">
       <div class="panel-heading"><h2 id="resultHeading">Результат</h2><span class="file-count" id="resultLocale">02 / Локалізація</span></div>

@@ -259,7 +259,7 @@ const SIZE_INSTRUCTIONS = {
 };
 
 // Виклик Claude API
-async function callClaude(content, { system, signal } = {}) {
+async function callClaude(content, { system, signal, onUsage } = {}) {
   const resp = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     signal,
@@ -281,6 +281,7 @@ async function callClaude(content, { system, signal } = {}) {
     throw Object.assign(new Error(`Помилка Claude API (${resp.status}). Перевірте API ключ/модель.`), { api: true, status: resp.status });
   }
   const data = await resp.json();
+  if (data.usage) onUsage?.(data.usage);
   return (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
 }
 

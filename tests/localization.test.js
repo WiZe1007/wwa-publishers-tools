@@ -127,7 +127,8 @@ test('unresolved spam is never marked ready and retries are bounded', async t =>
   let calls = 0;
   const post = await fixture(t, { callClaude: async () => { calls++; return JSON.stringify({ ...clean, title: 'garden garden' }); } });
   const { data } = await post();
-  assert.equal(calls, 5); assert.equal(data.ready, false); assert.equal(data.checks.clean, false);
+  assert.equal(calls, 2); assert.equal(data.ready, false); assert.equal(data.checks.clean, false);
+  assert.equal(data.usage.calls, 2); assert.equal(data.usage.limit, 2);
 });
 test('Spanish function-word spam reaches repair and cannot produce ready:true', async t => {
   let calls = 0;
@@ -144,7 +145,7 @@ test('Spanish function-word spam reaches repair and cannot produce ready:true', 
   const checked = await post('/check', spanishReport);
   assert.equal(checked.data.clean, false);
   const { data } = await post('', spanishReport);
-  assert.equal(calls, 5); assert.equal(data.ready, false);
+  assert.equal(calls, 2); assert.equal(data.ready, false);
   assert.ok(data.checks.issues.some(issue => issue.includes('de ×25')));
 });
 test('preserve-title option enforces the original brand even if AI changes it', async t => {
@@ -179,7 +180,7 @@ test('repair starts from the current result, with aggregated forms and a regiona
     return JSON.stringify(source);
   } });
   const { data } = await post('', { ...source, mode: 'repair' });
-  assert.equal(data.ready, false); assert.equal(data.attempts, 5);
+  assert.equal(data.ready, false); assert.equal(data.attempts, 2);
 });
 test('repair receives the latest candidate even when its score ties the best', async t => {
   let calls = 0;
@@ -260,7 +261,7 @@ test('repair editor uses the original reference, not a previously damaged candid
   assert.equal((await post('', { ...clean, mode: 'repair', reference, qualityReview: true })).data.ready, true);
 });
 
-test('editor checks a spammy first draft and carries its feedback through density repairs', async t => {
+test('editor skips a spammy intermediate draft to avoid paying for a discarded version', async t => {
   let drafts = 0, reviews = 0;
   const post = await fixture(t, { callClaude: async (content, { system }) => {
     const payload = JSON.parse(content);
@@ -269,8 +270,8 @@ test('editor checks a spammy first draft and carries its feedback through densit
       return JSON.stringify({ issues: [{ field: 'shortDescription', category: 'grammar', message: 'Помилка.', quote: '', suggestion: 'Виправте граматику.' }] });
     }
     if (++drafts > 1) {
-      assert.equal(payload.editorFeedback[0].category, 'grammar');
-      assert.ok(payload.fieldsToRepair.includes('shortDescription'));
+      assert.equal(reviews, 0);
+      assert.ok(payload.fieldsToRepair.includes('fullDescription'));
     }
     return JSON.stringify({ ...clean, fullDescription: 'garden garden garden garden' });
   } });
@@ -278,7 +279,7 @@ test('editor checks a spammy first draft and carries its feedback through densit
   assert.equal(drafts, 2); assert.equal(reviews, 1); assert.equal(data.ready, false);
 });
 
-test('third distinct draft can receive editorial approval without a two-review ceiling', async t => {
+test('unresolved editorial criticism stops at the four-call spending cap', async t => {
   let drafts = 0, reviews = 0;
   const post = await fixture(t, { callClaude: async (content, { system }) => {
     if (system.includes('careful app-store copy editor')) {
@@ -288,7 +289,8 @@ test('third distinct draft can receive editorial approval without a two-review c
     return JSON.stringify({ ...clean, fullDescription: clean.fullDescription + [' Discover gardens.', ' Explore forests.', ' Enjoy nature.'][drafts++] });
   } });
   const { data } = await post('', { ...clean, qualityReview: true });
-  assert.equal(data.ready, true); assert.equal(data.editorCalls, 3); assert.equal(drafts, 3);
+  assert.equal(data.ready, false); assert.equal(data.editorCalls, 2); assert.equal(drafts, 2);
+  assert.equal(data.usage.calls, 4); assert.equal(data.usage.limit, 4);
 });
 
 for (const kind of ['malformed', 'network']) test(`one ${kind} failure automatically recovers`, async t => {
@@ -337,4 +339,27 @@ test('incomplete editorial response is retried without generating the translatio
   } });
   const { data } = await post('', { ...clean, qualityReview: true });
   assert.equal(drafts, 1); assert.equal(reviews, 2); assert.equal(data.ready, true);
+});
+
+test('usage totals include generation and editorial tokens returned by the provider', async t => {
+  const post = await fixture(t, { callClaude: async (content, { system, onUsage }) => {
+    onUsage({ input_tokens: 123, output_tokens: 45 });
+    return system.includes('careful app-store copy editor') ? '{"issues":[]}' : JSON.stringify(clean);
+  } });
+  const { data } = await post('', { ...clean, qualityReview: true });
+  assert.deepEqual(data.usage, { calls: 2, limit: 4, inputTokens: 246, outputTokens: 90, reportedCalls: 2 });
+});
+
+test('retries and repairs cannot exceed the optional four-call ceiling', async t => {
+  let calls = 0, drafts = 0, reviews = 0;
+  const post = await fixture(t, { callClaude: async (content, { system }) => {
+    calls++;
+    if (system.includes('careful app-store copy editor')) {
+      if (++reviews === 1) return '{}';
+      return JSON.stringify({ issues: [{ field: 'fullDescription', category: 'grammar', message: 'Уточніть.', quote: '', suggestion: 'Перефразуйте.' }] });
+    }
+    return JSON.stringify({ ...clean, fullDescription: clean.fullDescription + (++drafts === 1 ? ' Explore forests.' : ' Discover nature.') });
+  } });
+  const { data } = await post('', { ...clean, qualityReview: true });
+  assert.equal(calls, 4); assert.equal(data.usage.calls, 4); assert.equal(data.ready, false);
 });

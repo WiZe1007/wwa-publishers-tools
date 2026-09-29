@@ -61,8 +61,16 @@ export function mount(root) {
       if (error.name === 'AbortError') throw error;
       throw new Error('Сервер повернув некоректну відповідь. Спробуйте ще раз.');
     }
-    if (!response.ok) throw new Error(data.error || 'Не вдалося виконати запит.');
+    if (!response.ok) throw Object.assign(new Error(data.error || 'Не вдалося виконати запит.'), { usage: data.usage });
     return data;
+  }
+  function showUsage(usage) {
+    $('usageStatus').hidden = !usage;
+    if (!usage) return;
+    if (!usage.limit) { $('usageStatus').textContent = 'Перевірка повторів: 0 AI-запитів. Claude API не використовується.'; return; }
+    $('usageStatus').textContent = `AI-запитів у цій спробі: ${usage.calls} із максимум ${usage.limit}.` +
+      (usage.reportedCalls ? ` Токенів за отриманими відповідями: ${usage.inputTokens} вхідних / ${usage.outputTokens} вихідних.` : '') +
+      ' Перевірка повторів — без Claude API.';
   }
   function buttons() {
     $('sourceFields').disabled = busy;
@@ -197,11 +205,13 @@ export function mount(root) {
     const currentSource = JSON.stringify(source());
     const saved = rememberResult();
     busy = true; controller = new AbortController();
+    showUsage(null);
     $('resultNotice').hidden = true;
     stale('Очікування нового результату…');
     $('generationStatus').textContent = repair ? 'Виправляємо текст… Це може зайняти до 2,5 хвилин.' : 'Перекладаємо й перевіряємо… Це може зайняти до 2,5 хвилин.';
     try {
       const data = await request('', payload, controller.signal);
+      showUsage(data.usage);
       resultLocale = data.locale;
       if (!repair) { sourceSnapshot = currentSource; referenceSource = payload; }
       const language = languages.find(item => item.code === resultLocale);
@@ -220,6 +230,7 @@ export function mount(root) {
         : data.checks.clean && data.checks.editor?.status === 'unavailable' ? 'Переклад отримано. Повтори перевірено; AI-перевірка мови недоступна.'
         : 'Текст готовий, але потребує правок. Підказки — під результатом.');
     } catch (error) {
+      showUsage(error.usage);
       $('generationStatus').textContent = error.name === 'AbortError' ? 'Запит скасовано.' : error.message;
       restoreResult(saved, error.name === 'AbortError' ? 'Нову спробу скасовано.' : $('generationStatus').textContent);
     } finally { busy = false; controller = null; buttons(); }
@@ -232,6 +243,7 @@ export function mount(root) {
     const payload = source();
     const saved = rememberResult();
     $('resultNotice').hidden = true;
+    showUsage({ calls: 0, limit: 0 });
     busy = true; controller = new AbortController(); stale('Перевіряємо вихідний текст…');
     $('generationStatus').textContent = 'Перевіряємо без перекладу та без AI-виклику…';
     try {
@@ -249,6 +261,7 @@ export function mount(root) {
     finally { busy = false; controller = null; buttons(); }
   };
   $('checkResult').onclick = async () => {
+    showUsage({ calls: 0, limit: 0 });
     const version = ++checkVersion;
     const data = result();
     const saved = rememberResult();
