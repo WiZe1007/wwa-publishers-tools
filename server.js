@@ -162,7 +162,7 @@ SEO-БАЗА (незмінна): визнач 3–5 цільових ключо�
 2. Далі текст ділиться на 3–4 ТЕМАТИЧНІ СЕКЦІЇ з власними заголовками (пиши заголовки як короткі фрази з великої літери, наприклад "Inside the game", "What makes it different", "Built for short sessions"). Заголовки формулюй під конкретний додаток, не шаблонні.
 3. Кожна секція — суцільний абзац на 2–4 речення (НЕ буліт-списки!). Функції описуй у зв'язному тексті, а не переліком.
 4. Максимум ОДИН короткий список на весь опис — і лише якщо без нього ніяк; тоді це має бути перелік у 3–4 рядки в кінці однієї з секцій.
-5. Наприкінці — міні-блок питань і відповідей у 2–3 пункти (формат "Q: ... A: ..." або "Питання одним рядком, відповідь наступним"), який закриває практичні моменти: чи потрібен інтернет, скільки триває сесія, для кого гра, чи є покупки — але тільки те, що підтверджується описом розробника чи скріншотами.
+5. Наприкінці — міні-блок питань і відповідей у 2–3 пункти (формат "Q: ... A: ..." або "Питання одним рядком, відповідь наступним"), який закриває практичні моменти: скільки триває сесія, для кого гра, чи є покупки — але тільки те, що підтверджується описом розробника чи скріншотами. НЕ додавай питання та відповіді про необхідність інтернету, підключення до мережі або офлайн-режим жодною мовою (зокрема "Q: Do I need an internet connection? A: ...").
 6. Фінал: одне спокійне речення-запрошення без слова "Download" на початку — тут доречно згадати назву додатку ще раз (якщо ліміт 3 не вичерпано).
 7. У кінці — короткий рядок з природними ключовими словами та синонімами (без стаффінгу), оформлений як звичайне речення, а не як перелік через кому.
 
@@ -473,7 +473,7 @@ Rewrite the description so that:
 2. The meaning, features and overall length stay the same.
 3. Do NOT add features that are not mentioned.
 4. Keep it natural, high-quality English for Google Play.
-5. Keep the same marketing tone and energy as the original text, including all emojis and formatting.${(tone === 'tiktok_aso_pro' || tone === 'tiktok_aso_max') ? `
+5. Keep the same marketing tone and energy as the original text, including all emojis and formatting.${tone === 'aso_pro_alt' ? '\n6. Do NOT include any question and answer about an internet connection, network access or offline play (including "Q: Do I need an internet connection? A: ..."). Preserve other supported Q&A topics.' : ''}${(tone === 'tiktok_aso_pro' || tone === 'tiktok_aso_max') ? `
 6. CRITICAL: Do NOT modify the mandatory compliance sentences ("Cash Out Rules: Real-money cash-outs are strictly blocked..." and "In-App Purchases: ...") and do NOT remove the required phrases: "social casino experience", "simulated luck", "virtual progress", "Players interact with virtual elements", "do not represent real-money gambling". Reduce word repetition ONLY in other parts of the text.` : ''}
 
 Description:
