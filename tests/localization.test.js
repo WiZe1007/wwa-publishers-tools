@@ -111,7 +111,7 @@ test('HTTP checker detects native-script repetition in every offered locale with
     assert.equal(status, 200, code);
     assert.equal(data.clean, false, code);
     assert.ok(data.analyses.fullDescription.spam.length, code);
-    assert.equal(data.version, 'quality-v6');
+    assert.equal(data.version, 'quality-v7');
   }
 });
 test('successful generation checks every field and sends source as JSON data', async t => {
@@ -152,6 +152,27 @@ test('actual Spanish residual is repaired through sentence alternatives in one p
   assert.equal(calls, 1); assert.equal(data.usage.calls, 1); assert.equal(data.ready, true);
   assert.equal(data.repair.status, 'fixed'); assert.equal(data.repair.afterExcess, 0);
   assert.equal(data.title, source.title); assert.equal(data.shortDescription, source.shortDescription);
+});
+test('French repair sends grouped counts to AI and never certifies an unchanged answer', async t => {
+  const source = require('./fixtures/french-blackjack');
+  let calls = 0;
+  const post = await fixture(t, { callClaude: async (content, options) => {
+    calls++;
+    const payload = JSON.parse(content);
+    assert.deepEqual(payload.fieldsToRepair, ['fullDescription']);
+    assert.match(options.system, /French de\/du, un\/une\/des, votre\/vos/);
+    assert.deepEqual(payload.fullDescriptionCheck.wordsToReduce.map(row => [row.word, row.count]),
+      [['de', 19], ['un', 18], ['votre', 14]]);
+    assert.ok(payload.repairPlan.sentences.length > 0);
+    return JSON.stringify({ replacements: [] });
+  } });
+  const { status, data } = await post('', { ...source, mode: 'repair' });
+  assert.equal(status, 200);
+  assert.equal(calls, 2); assert.equal(data.usage.limit, 2);
+  assert.equal(data.ready, false);
+  assert.equal(data.repair.status, 'unchanged');
+  assert.equal(data.fullDescription, source.fullDescription);
+  assert.deepEqual(data.checks.analyses.fullDescription.spam.map(row => row.count), [19, 18, 14]);
 });
 test('a worse full rewrite cannot replace the initial repair candidate', async t => {
   const source = require('./fixtures/spanish-blackjack');

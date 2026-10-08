@@ -1,5 +1,29 @@
 # Localize verification — 2026-09-28
 
+## French regression — 2026-10-08
+
+- Read both live textarea values: the WWA result and ASOMobile input were
+  byte-for-byte identical JavaScript strings (3226 UTF-16 units).
+- Saved that exact listing in `fixtures/french-blackjack.js`. External groups:
+  `de 19`, `un 18`, `votre 14`. The old checker split `du`, `des`, `vos` off and
+  incorrectly passed the listing. The new French family budgets detect all three.
+- Standalone numbers explain 464 external words vs 456 lexical words internally;
+  the conservative max remains 11, rather than increasing it to the external 12.
+- Independent ASOMobile probe confirmed `votre/vos`, `notre/nos` grouping and
+  contraction handling. It also assigned isolated `des` to `de`, while the
+  actual listing assigned its `des` to `un`: these explicit budget rules are
+  NOT a claim of context-sensitive French lemmatization or universal parity.
+- 14 new tests cover all four French regional options, exact surface counts,
+  function-word exemptions in natural/short fields, apostrophes, family uniqueness,
+  surgical repair input, no-progress rejection, two-call cap, and export blocking.
+- `npm test`: 891 passed. AI/provider tests use mocks; no paid Claude requests
+  were made for this change. Successful real-model French rewriting is not claimed.
+- Chrome localhost flow: select French, paste the exact three fields, click
+  free repetition check. The three issues appear, the complete text remains
+  unchanged, copy/download are disabled, and console warnings/errors are empty.
+- Native browser input controls verified independently of the VM tests. The
+  existing user tabs/form values were not reloaded or overwritten.
+
 ## Reproduction and fix
 
 The actual Spanish listing in `fixtures/spanish-listing.js` previously passed

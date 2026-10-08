@@ -56,6 +56,22 @@ test('manual edits invalidate ready state; checks block spam then allow repaired
   $('resultFull').value = valid.fullDescription; $('resultFull').listeners.input();
   await $('checkResult').onclick(); assert.equal($('downloadResult').disabled, false);
 });
+test('French user listing cannot be copied or downloaded after a free repetition check', async () => {
+  const source = require('./fixtures/french-blackjack');
+  const { $, state } = await mount();
+  $('locale').value = source.locale;
+  $('sourceTitle').value = source.title;
+  $('sourceShort').value = source.shortDescription;
+  $('sourceFull').value = source.fullDescription;
+  state.respond = () => assert.fail('Free French checks must not invoke AI');
+  await $('checkSource').onclick();
+  assert.equal($('resultFull').value, source.fullDescription);
+  assert.match($('checkSummary').textContent, /Є зайві повтори/);
+  assert.match($('checkIssues').children.map(item => item.textContent).join('\n'), /«de».*19/);
+  assert.equal($('copyFull').disabled, true);
+  assert.equal($('copyResult').disabled, true);
+  assert.equal($('downloadResult').disabled, true);
+});
 
 test('brand protection is enabled by default with a label that includes descriptions', () => {
   const html = fs.readFileSync('public/localize.html', 'utf8');
