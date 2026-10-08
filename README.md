@@ -125,8 +125,9 @@ AI адаптує всі три поля, зберігаючи факти й о�
 
 - `GET /api/localize/languages` — дозволені мови й ліміти.
 - `POST /api/localize` — `{locale, title, shortDescription, fullDescription, preserveTitle?, mode?: 'localize' | 'repair', profile?: 'strict' | 'natural', qualityReview?: boolean, reference?: {title, shortDescription, fullDescription}}`.
-- `POST /api/localize/check` — ті самі текстові поля, `locale` та `profile`, без AI-виклику.
-- `profile` за замовчуванням `strict`; `qualityReview` у API за замовчуванням `false`, у формі увімкнено.
+- `POST /api/localize/check` — ті самі текстові поля, `locale`, `profile` і, для перевірки бренду, `preserveTitle` та вихідний `reference`, без AI-виклику.
+- `preserveTitle: true` зберігає назву, а також оригінальний бренд у тих описах, де він був у вихідному тексті. Для назви на кшталт `Egypt : Global Casino` захищається згаданий в описах `Global Casino`. Бренд маскується перед AI-обробкою та відновлюється перед перевіркою довжини/повторів; відсутній або перекладений бренд блокує готовність. Зайві згадки дозволено скорочувати, але не останню. При виправленні й повторній перевірці використовується збережений оригінал, а не вже перекладений результат.
+- `profile` за замовчуванням `strict`; `qualityReview` за замовчуванням вимкнено в API та формі. Збереження бренду (`preserveTitle`) у формі ввімкнено.
 
 Ліміти результату: 30 / 80 / 4000 Unicode-символів із пробілами; джерела:
 200 / 500 / 12000. Використовується `Intl.Segmenter`, для англійської — наявне

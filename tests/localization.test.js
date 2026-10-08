@@ -111,7 +111,7 @@ test('HTTP checker detects native-script repetition in every offered locale with
     assert.equal(status, 200, code);
     assert.equal(data.clean, false, code);
     assert.ok(data.analyses.fullDescription.spam.length, code);
-    assert.equal(data.version, 'quality-v5');
+    assert.equal(data.version, 'quality-v6');
   }
 });
 test('successful generation checks every field and sends source as JSON data', async t => {

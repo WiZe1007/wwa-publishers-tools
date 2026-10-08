@@ -2,7 +2,8 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const { LANGUAGES, createChecker } = require('../lib/localization');
+const { LANGUAGES, createChecker, validate } = require('../lib/localization');
+const { createBrandProtection } = require('../lib/localization-brand');
 
 const valid = { locale: 'pl', title: 'Focus Garden', shortDescription: 'Zaplanuj spokojny dzień.',
   fullDescription: 'Wybierz zadanie. Ustaw minutnik i rozpocznij sesję. Przeglądaj historię oraz odpoczywaj.' };
@@ -22,7 +23,10 @@ async function mount() {
     navigator: { clipboard: { async writeText(text) { state.copied = text; } } },
     URL: { createObjectURL(blob) { state.blob = blob; return 'blob:test'; }, revokeObjectURL() {} },
     fetch: async (url, options) => ({ ok: true, json: async () => url.endsWith('/languages') ? { languages: LANGUAGES }
-      : url.endsWith('/check') ? check(JSON.parse(options.body)) : state.respond(JSON.parse(options.body)) }) });
+      : url.endsWith('/check') ? (() => {
+        const body = JSON.parse(options.body), source = validate(body);
+        return check(source, createBrandProtection(source, body.reference));
+      })() : state.respond(JSON.parse(options.body)) }) });
   const module = new vm.SourceTextModule(fs.readFileSync('public/js/tools/localize.js', 'utf8'), { context });
   await module.link(() => {}); await module.evaluate();
   module.namespace.mount({ querySelector: selector => $(selector.slice(1)) });
@@ -52,6 +56,56 @@ test('manual edits invalidate ready state; checks block spam then allow repaired
   $('resultFull').value = valid.fullDescription; $('resultFull').listeners.input();
   await $('checkResult').onclick(); assert.equal($('downloadResult').disabled, false);
 });
+
+test('brand protection is enabled by default with a label that includes descriptions', () => {
+  const html = fs.readFileSync('public/localize.html', 'utf8');
+  assert.match(html, /id="preserveTitle" type="checkbox" checked/);
+  assert.match(html, /Не перекладати назву та бренд в описах/);
+});
+
+test('free checks detect deleted brands using the saved original, not changed source fields', async () => {
+  const { $, state, generate } = await mount();
+  const branded = { ...valid, shortDescription: 'Focus Garden: Zaplanuj spokojny dzień.', fullDescription: 'Focus Garden. Wybierz zadanie.' };
+  $('preserveTitle').checked = true;
+  $('sourceShort').value = branded.shortDescription; $('sourceFull').value = branded.fullDescription;
+  state.respond = async body => ({ ...branded, checks: check(branded, createBrandProtection(body)), ready: true });
+  await generate(); assert.equal($('downloadResult').disabled, false);
+  $('sourceTitle').value = 'Unrelated name'; $('sourceFull').value = 'Unrelated source';
+  $('resultFull').value = 'Wybierz zadanie.'; $('resultFull').listeners.input();
+  await $('checkResult').onclick();
+  assert.equal($('downloadResult').disabled, true);
+  assert.ok($('checkIssues').children.some(item => item.textContent.includes('поверніть оригінальну назву «Focus Garden»')));
+  assert.match($('editorSummary').textContent, /збереження бренду/);
+  $('resultFull').value = branded.fullDescription; $('resultFull').listeners.input();
+  await $('checkResult').onclick(); assert.equal($('downloadResult').disabled, false);
+});
+
+test('toggling brand preservation rechecks missing names without any paid AI call', async () => {
+  const { $, state } = await mount();
+  $('sourceFull').value = 'Focus Garden. Wybierz zadanie.';
+  await $('checkSource').onclick();
+  $('resultFull').value = 'Wybierz zadanie.'; $('resultFull').listeners.input();
+  await $('checkResult').onclick(); assert.equal($('copyFull').disabled, false);
+  state.respond = () => assert.fail('Checkbox change must not invoke AI');
+  $('preserveTitle').checked = true;
+  const pending = $('preserveTitle').listeners.change();
+  assert.equal($('copyFull').disabled, true);
+  await pending; assert.equal($('copyFull').disabled, true);
+  $('preserveTitle').checked = false;
+  await $('preserveTitle').listeners.change(); assert.equal($('copyFull').disabled, false);
+});
+
+test('AI repair keeps original brand reference even when the user makes the result title overlong', async () => {
+  const { $, state, generate } = await mount();
+  $('preserveTitle').checked = true; await generate();
+  $('resultTitle').value = 'A'.repeat(31); $('resultTitle').listeners.input();
+  state.respond = async body => {
+    assert.equal(body.preserveTitle, true); assert.equal(body.reference.title, valid.title);
+    assert.equal(body.title, 'A'.repeat(31));
+    return { ...valid, checks: check(valid, createBrandProtection(body, body.reference)), ready: true };
+  };
+  await $('repairResult').onclick(); assert.equal($('resultTitle').value, valid.title);
+});
 test('unsuccessful AI repair reports no progress and keeps unverified exports blocked', async () => {
   const { $, state, generate } = await mount();
   const spammy = { ...valid, fullDescription: 'minutnik minutnik minutnik minutnik' };
@@ -63,7 +117,7 @@ test('unsuccessful AI repair reports no progress and keeps unverified exports bl
     return { ...spammy, checks: check(spammy), ready: false, repair: { status: 'unchanged', beforeExcess: 3, afterExcess: 3 } };
   };
   await $('repairResult').onclick();
-  assert.match($('generationStatus').textContent, /AI не зменшив повтори/);
+  assert.match($('generationStatus').textContent, /AI не виправив усі зауваження/);
   assert.equal($('resultFull').value, spammy.fullDescription);
   assert.equal($('downloadResult').disabled, true);
 });
@@ -239,7 +293,7 @@ test('manual changes invalidate AI editorial approval and repair retains the ori
     return { ...valid, checks: check(valid), ready: true, attempts: 1 };
   };
   await $('repairResult').onclick();
-  assert.match($('editorSummary').textContent, /Перевірено лише повтори/);
+  assert.match($('editorSummary').textContent, /Перевірено повтори/);
 });
 
 test('large reports paginate without hiding search matches beyond the first page', async () => {

@@ -16,6 +16,7 @@ export function simpleFixes(checks) {
     for (const item of analysis.spam) fixes.push(`${label}: «${item.word}»${item.forms?.length > 1 ? ' та його форми' : ''} — ${item.count} ${plural(item.count, 'раз', 'рази', 'разів')}. Приберіть ${item.removeCount} ${plural(item.removeCount, 'зайвий повтор', 'зайві повтори', 'зайвих повторів')}.`);
     for (const item of analysis.sentences || []) fixes.push(`${label}: речення «${item.text.length > 100 ? item.text.slice(0, 100) + '…' : item.text}» повторюється. Залиште один раз.`);
     for (const item of analysis.phrases || []) if (item.excessive) fixes.push(`${label}: фраза «${item.text}» повторюється ${item.count} ${plural(item.count, 'раз', 'рази', 'разів')}. Перефразуйте частину речень.`);
+    for (const item of checks.brand?.missing || []) if (item.field === field) fixes.push(`${label}: поверніть оригінальну назву «${item.name}» без перекладу.`);
     if (checks.editor?.issues.some(item => item.field === field)) fixes.push(`${label}: AI знайшов неточності в мові або змісті. Натисніть «Виправити з AI» або перегляньте деталі.`);
   }
   if (checks.issues.some(issue => issue.includes('письма'))) fixes.push('Повний опис написано не обраною мовою. Перекладіть його ще раз.');
@@ -43,7 +44,8 @@ export function mount(root) {
   const profile = () => $('checkProfile').value || 'strict';
   const values = ids => Object.fromEntries(fields.map((field, index) => [field, $(ids[index]).value.trim()]));
   const source = () => ({ ...values(sourceIds), locale: $('locale').value, profile: profile(), qualityReview: $('qualityReview').checked, preserveTitle: $('preserveTitle').checked });
-  const result = () => ({ ...values(resultIds), locale: resultLocale, profile: profile() });
+  const result = () => ({ ...values(resultIds), locale: resultLocale, profile: profile(), preserveTitle: $('preserveTitle').checked,
+    ...(referenceSource ? { reference: referenceSource } : {}) });
   const snapshot = () => JSON.stringify(result());
 
   async function request(path, body, signal) {
@@ -145,7 +147,7 @@ export function mount(root) {
       (checks.editor?.status === 'passed' ? 'AI також перевірив мову та зміст.'
       : checks.editor?.status === 'needs_revision' ? 'Мову або зміст також потрібно покращити.'
       : checks.editor?.status === 'unavailable' ? `Мову не перевірено: ${checks.editor.message || 'AI не відповів.'} ${checks.clean ? 'Можна зберегти текст, але перед публікацією перечитайте переклад.' : 'Повтори перевірено окремо — підказки нижче.'}`
-      : 'Перевірено лише повтори, не якість перекладу.') + (checks.warnings?.length ? ' Додаткові поради — у деталях.' : '');
+      : 'Перевірено повтори' + (checks.brand ? ' та збереження бренду' : '') + ', не якість перекладу.') + (checks.warnings?.length ? ' Додаткові поради — у деталях.' : '');
     $('repairResult').textContent = checks.editor?.status === 'unavailable' ? 'Повторити з AI' : checks.clean && checks.editor?.status !== 'needs_revision' ? 'Покращити з AI' : 'Виправити з AI';
     $('adviceDetails').hidden = !checks.warnings?.length;
     $('checkAdvice').replaceChildren(...(checks.warnings || []).map(message => { const li = document.createElement('li'); li.textContent = message; return li; }));
@@ -204,8 +206,7 @@ export function mount(root) {
     if (busy) return;
     const payload = repair ? { ...result(), mode: 'repair',
       qualityReview: $('qualityReview').checked,
-      ...(referenceSource ? { reference: referenceSource } : {}),
-      preserveTitle: $('preserveTitle').checked && Array.from(result().title).length <= limits[0] } : source();
+      preserveTitle: $('preserveTitle').checked } : source();
     const currentSource = JSON.stringify(source());
     const saved = rememberResult();
     busy = true; controller = new AbortController();
@@ -230,7 +231,7 @@ export function mount(root) {
       renderCheck(data.checks);
       if (data.warning) { $('resultNotice').hidden = false; $('resultNotice').textContent = data.warning; }
       $('generationStatus').textContent = data.warning ? 'Не всі правки завершено. Отриманий текст збережено праворуч.' : (repair && data.repair?.status === 'unchanged'
-        ? 'AI не зменшив повтори. Попередній текст збережено; перевірте конкретні слова під результатом.'
+        ? 'AI не виправив усі зауваження. Попередній текст збережено; підказки — під результатом.'
         : repair && data.repair?.status === 'improved'
         ? `Виправлено зайвих повторів: ${Math.max(0, data.repair.beforeExcess - data.repair.afterExcess)}. Залишилося: ${data.repair.afterExcess}. Підказки — під результатом.`
         : data.ready
@@ -291,6 +292,9 @@ export function mount(root) {
   $('checkProfile').addEventListener('change', () => {
     $('profileHelp').textContent = profile() === 'natural' ? 'Перевіряємо основні слова. Часті «і», «в», «на» та подібні слова не вважаємо проблемою.' : 'Перевіряємо всі слова, навіть «і», «в» та «на». Це суворіший режим.';
     if (hasResult) { stale('Профіль змінено. Перевіряємо текст за новими правилами…'); return $('checkResult').onclick(); }
+  });
+  $('preserveTitle').addEventListener('change', () => {
+    if (hasResult) { stale('Налаштування бренду змінено. Перевіряємо текст…'); return $('checkResult').onclick(); }
   });
   const exportText = () => {
     const data = result();
