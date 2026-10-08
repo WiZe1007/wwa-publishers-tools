@@ -135,6 +135,46 @@ test('spam triggers repair with specific issues, then returns a clean candidate'
   const { data } = await post();
   assert.equal(data.ready, true); assert.equal(data.attempts, 2);
 });
+test('actual Spanish residual is repaired through sentence alternatives in one paid call', async t => {
+  const source = require('./fixtures/spanish-blackjack');
+  let calls = 0;
+  const post = await fixture(t, { callClaude: async content => {
+    calls++;
+    const payload = JSON.parse(content);
+    assert.deepEqual(payload.fieldsToRepair, ['fullDescription']);
+    assert.equal(payload.repairPlan.sentences.length, 1);
+    assert.equal(payload.source.fullDescription, undefined); // no duplicated full source
+    return JSON.stringify({ replacements: [{ id: payload.repairPlan.sentences[0].id, alternatives: [
+      '⚙️ Opción para Reiniciar: Desde Ajustes puedes borrar todas las estadísticas y recuperar el saldo inicial cuando quieras.'
+    ] }] });
+  } });
+  const { data } = await post('', { ...source, mode: 'repair' });
+  assert.equal(calls, 1); assert.equal(data.usage.calls, 1); assert.equal(data.ready, true);
+  assert.equal(data.repair.status, 'fixed'); assert.equal(data.repair.afterExcess, 0);
+  assert.equal(data.title, source.title); assert.equal(data.shortDescription, source.shortDescription);
+});
+test('a worse full rewrite cannot replace the initial repair candidate', async t => {
+  const source = require('./fixtures/spanish-blackjack');
+  const post = await fixture(t, { callClaude: async () => JSON.stringify({ ...source, fullDescription: 'tu tus tu tus tu tus' }) });
+  const { data } = await post('', { ...source, mode: 'repair' });
+  assert.equal(data.fullDescription, source.fullDescription);
+  assert.equal(data.repair.status, 'unchanged'); assert.equal(data.ready, false);
+  assert.equal(data.usage.calls, 2);
+});
+test('keeping the original after a worse editorial rewrite never claims it was AI-reviewed', async t => {
+  const post = await fixture(t, { callClaude: async (content, { system }) => {
+    if (system.includes('careful app-store copy editor')) return JSON.stringify({ issues: [{
+      field: 'fullDescription', category: 'grammar', message: 'Помилка нової версії.', quote: '', suggestion: 'Виправте.'
+    }] });
+    return JSON.stringify({ ...clean, fullDescription: clean.fullDescription + ' New passage.' });
+  } });
+  const { data } = await post('', { ...clean, mode: 'repair', qualityReview: true });
+  assert.equal(data.fullDescription, clean.fullDescription);
+  assert.equal(data.checks.clean, true);
+  assert.equal(data.checks.editor.status, 'unavailable');
+  assert.equal(data.checks.editor.reason, 'not_reviewed');
+  assert.equal(data.ready, false);
+});
 test('actual Urdu false negative triggers a bounded repair with character and shortening budgets', async t => {
   const urdu = require('./fixtures/urdu-listing');
   let calls = 0;
@@ -169,7 +209,7 @@ test('unresolved spam is never marked ready and retries are bounded', async t =>
 test('Spanish function-word spam reaches repair and cannot produce ready:true', async t => {
   let calls = 0;
   const post = await fixture(t, { callClaude: async (content, { system }) => {
-    assert.match(system, /INCLUDING grammatical function words/);
+    assert.match(system, /INCLUDING grammatical function words/i);
     const payload = JSON.parse(content);
     if (calls++) {
       assert.equal(payload.fullDescriptionCheck.maxAllowed, 7);

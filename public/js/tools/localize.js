@@ -229,7 +229,11 @@ export function mount(root) {
       $('resultLocale').textContent = language?.label || resultLocale;
       renderCheck(data.checks);
       if (data.warning) { $('resultNotice').hidden = false; $('resultNotice').textContent = data.warning; }
-      $('generationStatus').textContent = data.warning ? 'Не всі правки завершено. Отриманий текст збережено праворуч.' : (data.ready
+      $('generationStatus').textContent = data.warning ? 'Не всі правки завершено. Отриманий текст збережено праворуч.' : (repair && data.repair?.status === 'unchanged'
+        ? 'AI не зменшив повтори. Попередній текст збережено; перевірте конкретні слова під результатом.'
+        : repair && data.repair?.status === 'improved'
+        ? `Виправлено зайвих повторів: ${Math.max(0, data.repair.beforeExcess - data.repair.afterExcess)}. Залишилося: ${data.repair.afterExcess}. Підказки — під результатом.`
+        : data.ready
         ? `Готово: ${language?.label || resultLocale}. Результат — праворуч.`
         : data.checks.clean && data.checks.editor?.status === 'unavailable' ? 'Переклад отримано. Повтори перевірено; AI-перевірка мови недоступна.'
         : 'Текст готовий, але потребує правок. Підказки — під результатом.');

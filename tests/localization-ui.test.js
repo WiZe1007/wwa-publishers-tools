@@ -52,6 +52,31 @@ test('manual edits invalidate ready state; checks block spam then allow repaired
   $('resultFull').value = valid.fullDescription; $('resultFull').listeners.input();
   await $('checkResult').onclick(); assert.equal($('downloadResult').disabled, false);
 });
+test('unsuccessful AI repair reports no progress and keeps unverified exports blocked', async () => {
+  const { $, state, generate } = await mount();
+  const spammy = { ...valid, fullDescription: 'minutnik minutnik minutnik minutnik' };
+  state.respond = async () => ({ ...spammy, checks: check(spammy), ready: false });
+  await generate();
+  state.respond = async body => {
+    assert.equal(body.mode, 'repair');
+    assert.equal(body.fullDescription, spammy.fullDescription);
+    return { ...spammy, checks: check(spammy), ready: false, repair: { status: 'unchanged', beforeExcess: 3, afterExcess: 3 } };
+  };
+  await $('repairResult').onclick();
+  assert.match($('generationStatus').textContent, /AI не зменшив повтори/);
+  assert.equal($('resultFull').value, spammy.fullDescription);
+  assert.equal($('downloadResult').disabled, true);
+});
+test('partial AI repair shows the actual remaining repetitions', async () => {
+  const { $, state, generate } = await mount();
+  await generate();
+  const partial = { ...valid, fullDescription: 'minutnik minutnik' };
+  state.respond = async () => ({ ...partial, checks: check(partial), ready: false,
+    repair: { status: 'improved', beforeExcess: 3, afterExcess: 1 } });
+  await $('repairResult').onclick();
+  assert.match($('generationStatus').textContent, /Виправлено зайвих повторів: 2. Залишилося: 1/);
+  assert.equal($('downloadResult').disabled, true);
+});
 test('failure preserves previous text and its existing verification and export', async () => {
   const { $, state, generate } = await mount(); await generate();
   state.respond = async () => { throw new Error('AI unavailable'); }; await generate();
