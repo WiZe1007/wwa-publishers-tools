@@ -1,4 +1,5 @@
 import { FIXED_DATE, isImage, isVideo, stripImageMetadata, stripVideoMetadata } from '../metadata.js';
+import { requestJson } from '../http.js';
 
 // Each tool owns its DOM and state, including while detached during navigation.
 export function mount(root) {
@@ -170,6 +171,7 @@ function updCount(){ $('shortCount').textContent = `(${$('shortDesc').value.leng
 
 // ================= AI generation =================
 $('genBtn').onclick = async () => {
+  if ($('genBtn').disabled) return;
   const name = $('appName').value.trim();
   const desc = $('devDescription').value.trim();
   const st = $('genStatus');
@@ -184,7 +186,7 @@ $('genBtn').onclick = async () => {
     for (const s of state.screenshots) thumbs.push(await compressImage(s.file, 800, 0.72));
 
     st.innerHTML = '<span class="spinner"></span>Claude генерує описи' + (state.screenshots.length > 8 ? ', обирає 8 найкращих скріншотів' : '') + ' та перевіряє на переспам...';
-    const resp = await fetch('/api/aso', {
+    const data = await requestJson('/api/aso', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -196,8 +198,9 @@ $('genBtn').onclick = async () => {
         screenshots: thumbs
       })
     });
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(data.error || 'Помилка сервера');
+    if (typeof data.shortDescription !== 'string' || !data.shortDescription.trim() ||
+        typeof data.fullDescription !== 'string' || !data.fullDescription.trim())
+      throw new Error('AI повернув неповний опис. Ваші попередні тексти не змінено.');
 
     $('shortDesc').value = data.shortDescription || '';
     $('fullDesc').value = data.fullDescription || '';
@@ -207,12 +210,12 @@ $('genBtn').onclick = async () => {
     if (data.selected) { state.selectedIdx = data.selected; renderShots(); }
     st.className = 'status ok';
     st.textContent = '✓ Готово! Перевірте описи — за потреби відредагуйте їх перед створенням ZIP.';
+    if (data.warning) { st.className = 'status'; st.textContent = 'Опис отримано. ' + data.warning; }
     if (data.spamCheck) showSpam(data.spamCheck, true);
   } catch (e) {
     st.className = 'status err';
     st.textContent = 'Помилка: ' + e.message;
-  }
-  $('genBtn').disabled = false;
+  } finally { $('genBtn').disabled = false; }
 };
 
 // ================= Spam check (аналог ASOMobile Text Analyzer) =================
@@ -227,7 +230,7 @@ function showSpam(sc, afterGen) {
   } else {
     st.className = 'status err';
     st.textContent = `⚠ Переспам: ${sc.remaining.map(w => `«${w.word}» ×${w.count} (${w.density}%)`).join(', ')} — ${limInfo}` +
-      (afterGen ? `. AI зробив ${sc.fixAttempts} спроб(и) виправлення — відредагуйте вручну або згенеруйте ще раз.` : '');
+      (afterGen ? `. AI зробив ${sc.fixAttempts} спроб(и) виправлення. Натисніть «Виправити переспам» або відредагуйте текст — генерувати заново не потрібно.` : '');
   }
   $('fixSpamBtn').style.display = sc.clean ? 'none' : '';
   box.innerHTML = '';
@@ -244,18 +247,19 @@ function showSpam(sc, afterGen) {
 
 // Перевірка тексту на переспам; повертає spamCheck або null
 async function runSpamCheck(text) {
-  const resp = await fetch('/api/spam-check', {
+  const d = await requestJson('/api/spam-check', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text })
-  });
-  const d = await resp.json();
-  if (!resp.ok) throw new Error(d.error || 'Помилка перевірки');
+  }, { timeoutMs: 60000 });
+  if (!Array.isArray(d.spam) || !Array.isArray(d.frequency))
+    throw new Error('Сервер повернув неповну перевірку. Ваш текст не змінено.');
   return { densityLimit: d.densityLimit, totalWords: d.totalWords, maxAllowed: d.maxAllowed,
            clean: d.spam.length === 0, remaining: d.spam, frequency: d.frequency };
 }
 
 $('fixSpamBtn').onclick = async () => {
+  if ($('fixSpamBtn').disabled) return;
   const st = $('spamStatus');
   const text = $('fullDesc').value.trim();
   if (!text) return;
@@ -263,21 +267,21 @@ $('fixSpamBtn').onclick = async () => {
   st.className = 'status';
   st.innerHTML = '<span class="spinner"></span>AI переписує опис без переспаму...';
   try {
-    const resp = await fetch('/api/fix-spam', {
+    const data = await requestJson('/api/fix-spam', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, appName: $('appName').value.trim() })
     });
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(data.error || 'Помилка сервера');
+    if (typeof data.fullDescription !== 'string' || !data.fullDescription.trim() || !data.spamCheck)
+      throw new Error('AI повернув неповний опис. Ваш поточний текст не змінено.');
     $('fullDesc').value = data.fullDescription;
     updFullCount();
     showSpam(data.spamCheck, true);
+    if (data.warning) st.textContent += ' ' + data.warning;
   } catch (e) {
     st.className = 'status err';
     st.textContent = 'Помилка: ' + e.message;
-  }
-  $('fixSpamBtn').disabled = false;
+  } finally { $('fixSpamBtn').disabled = false; }
 };
 
 $('spamBtn').onclick = async () => {
@@ -287,16 +291,7 @@ $('spamBtn').onclick = async () => {
   st.className = 'status';
   st.innerHTML = '<span class="spinner"></span>Перевіряю...';
   try {
-    const resp = await fetch('/api/spam-check', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text })
-    });
-    const data = await resp.json();
-    showSpam({
-      densityLimit: data.densityLimit, totalWords: data.totalWords, maxAllowed: data.maxAllowed,
-      clean: data.spam.length === 0, remaining: data.spam, frequency: data.frequency
-    }, false);
+    showSpam(await runSpamCheck(text), false);
   } catch (e) {
     st.className = 'status err';
     st.textContent = 'Помилка: ' + e.message;

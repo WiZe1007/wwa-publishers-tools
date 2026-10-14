@@ -5,6 +5,7 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const { createAiRequest, aiFailure } = require('./lib/ai-request');
 
 // Simple .env loader (no dependency needed)
 const envPath = path.join(__dirname, '.env');
@@ -33,6 +34,16 @@ app.use(express.static(path.join(__dirname, 'public'), {
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, aiConfigured: Boolean(API_KEY) });
 });
+
+// Injectable provider boundary for tests; no client can change these values.
+app.locals.callClaude = callClaude;
+app.locals.isAIConfigured = () => Boolean(API_KEY);
+const aiRequest = createAiRequest({ callClaude: req => req.app.locals.callClaude });
+function sendAiFailure(res, error, context) {
+  const failure = aiFailure(error);
+  context.code = failure.code;
+  if (!res.destroyed && !res.headersSent) res.status(failure.status).json({ code: failure.code, error: failure.error });
+}
 
 // ===== Спам-аналіз тексту (точна логіка ASOMobile Text Analyzer) =====
 // Форми слова об'єднуються (tap + taps + tapping + tapped = "tap"),
@@ -276,8 +287,8 @@ async function callClaude(content, { system, signal, onUsage } = {}) {
     })
   });
   if (!resp.ok) {
-    const errText = await resp.text();
-    console.error('Anthropic API error:', resp.status, errText);
+    await resp.text();
+    console.error('Anthropic API error:', resp.status);
     throw Object.assign(new Error(`Помилка Claude API (${resp.status}). Перевірте API ключ/модель.`), { api: true, status: resp.status });
   }
   const data = await resp.json();
@@ -295,9 +306,8 @@ app.use('/api/localize', require('./lib/localization').createLocalizationRouter(
 }));
 
 // Виправлення переспаму в довільному (в т.ч. відредагованому вручну) тексті
-app.post('/api/fix-spam', async (req, res) => {
+app.post('/api/fix-spam', aiRequest, async (req, res) => {
   try {
-    if (!API_KEY) return res.status(500).json({ error: 'ANTHROPIC_API_KEY не налаштований на сервері.' });
     let text = String((req.body || {}).text || '').trim();
     const appName = String((req.body || {}).appName || 'the app');
     if (!text) return res.status(400).json({ error: 'Текст порожній.' });
@@ -306,12 +316,14 @@ app.post('/api/fix-spam', async (req, res) => {
     if (analysis.spam.length === 0) {
       return res.json({ fullDescription: text, fixAttempts: 0, spamCheck: buildSpamCheck(analysis, 0) });
     }
+    if (!req.app.locals.isAIConfigured()) return sendAiFailure(res, { code: 'configuration' }, req.ai);
 
     const scoreOf = a => a.spam.reduce((s, w) => s + (w.density - SPAM_DENSITY), 0) + a.spam.length * 0.01;
     let best = { text, analysis };
     let attempts = 0;
+    let warning;
 
-    while (analysis.spam.length > 0 && attempts < 5) {
+    while (analysis.spam.length > 0 && attempts < req.ai.limit) {
       attempts++;
       const safeMax = Math.max(1, analysis.maxAllowed - 1);
       const prompt = `Below is a Google Play full description for the app "${appName}".
@@ -327,17 +339,26 @@ ${text}
 
 Respond STRICTLY as JSON without markdown:
 {"full_description": "..."}`;
-      const fixed = extractJSON(await callClaude([{ type: 'text', text: prompt }]));
-      if (fixed.full_description) text = String(fixed.full_description);
+      let fixed;
+      try {
+        fixed = extractJSON(await req.ai.run([{ type: 'text', text: prompt }]));
+        if (typeof fixed?.full_description !== 'string' || !fixed.full_description.trim())
+          throw Object.assign(new Error('invalid AI response'), { code: 'invalid_response' });
+      } catch (error) {
+        const failure = aiFailure(error); req.ai.code = failure.code;
+        warning = failure.error + ' Поточний опис збережено; перевірте зауваження нижче.';
+        break;
+      }
+      text = fixed.full_description.trim();
       analysis = analyzeText(text);
       if (scoreOf(analysis) < scoreOf(best.analysis)) best = { text, analysis };
     }
 
     if (scoreOf(analysis) > scoreOf(best.analysis)) { text = best.text; analysis = best.analysis; }
-    res.json({ fullDescription: text, fixAttempts: attempts, spamCheck: buildSpamCheck(analysis, attempts) });
+    if (!res.destroyed) res.json({ fullDescription: text, fixAttempts: attempts, spamCheck: buildSpamCheck(analysis, attempts),
+      usage: { calls: req.ai.calls, limit: req.ai.limit }, ...(warning ? { warning } : {}) });
   } catch (err) {
-    console.error(err);
-    res.status(err.api ? 502 : 500).json({ error: err.message });
+    sendAiFailure(res, err, req.ai);
   }
 });
 
@@ -366,15 +387,16 @@ app.post('/api/spam-check', (req, res) => {
 });
 
 // ASO generation + best-8 screenshot selection
-app.post('/api/aso', async (req, res) => {
+app.post('/api/aso', aiRequest, async (req, res) => {
   try {
-    if (!API_KEY) {
-      return res.status(500).json({ error: 'ANTHROPIC_API_KEY не налаштований на сервері.' });
-    }
     const { appName, description, category, tone = 'normal', size = 'small', screenshots = [] } = req.body || {};
     if (!appName || !description) {
       return res.status(400).json({ error: 'Потрібні назва додатку та опис.' });
     }
+    if (!Array.isArray(screenshots) || screenshots.length > 40 || screenshots.some(s => !s || typeof s.data !== 'string' ||
+        !s.data || (s.mediaType && !['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(s.mediaType))))
+      return res.status(400).json({ code: 'validation', error: 'Додайте коректні скріншоти (до 40 файлів).' });
+    if (!req.app.locals.isAIConfigured()) return sendAiFailure(res, { code: 'configuration' }, req.ai);
 
     const needSelection = screenshots.length > 8;
 
@@ -422,11 +444,12 @@ ${TONE_INSTRUCTIONS[tone] || TONE_INSTRUCTIONS.normal}
 
     let parsed;
     try {
-      parsed = extractJSON(await callClaude(content));
+      parsed = extractJSON(await req.ai.run(content));
+      if (typeof parsed?.short_description !== 'string' || !parsed.short_description.trim() ||
+          typeof parsed?.full_description !== 'string' || !parsed.full_description.trim())
+        throw Object.assign(new Error('invalid AI response'), { code: 'invalid_response' });
     } catch (e) {
-      if (e.api) return res.status(502).json({ error: e.message });
-      console.error('Failed to parse model response:', e);
-      return res.status(502).json({ error: 'Не вдалося розібрати відповідь AI. Спробуйте ще раз.' });
+      return sendAiFailure(res, e, req.ai);
     }
 
     let selected = null;
@@ -445,7 +468,8 @@ ${TONE_INSTRUCTIONS[tone] || TONE_INSTRUCTIONS.normal}
     let fullDescription = String(parsed.full_description || '');
     let analysis = analyzeText(fullDescription);
     let fixAttempts = 0;
-    const MAX_FIX = 5;
+    const MAX_FIX = req.ai.limit - req.ai.calls;
+    let warning;
 
     // Запам'ятовуємо найкращий варіант (раптом чергова спроба зробить гірше)
     let best = { text: fullDescription, analysis };
@@ -453,7 +477,6 @@ ${TONE_INSTRUCTIONS[tone] || TONE_INSTRUCTIONS.normal}
 
     while (analysis.spam.length > 0 && fixAttempts < MAX_FIX) {
       fixAttempts++;
-      console.log(`Spam fix attempt ${fixAttempts}:`, analysis.spam.map(s => `${s.word}(${s.count}, ${s.density}%)`).join(', '));
       try {
         const safeMax = Math.max(1, analysis.maxAllowed - 1); // запас міцності на різницю в підрахунку
         // Слова на межі — теж просимо трохи розвантажити, щоб не з'явився переспам після правок
@@ -481,12 +504,15 @@ ${fullDescription}
 
 Respond STRICTLY as JSON without markdown:
 {"full_description": "..."}`;
-        const fixed = extractJSON(await callClaude([{ type: 'text', text: fixPrompt }]));
-        if (fixed.full_description) fullDescription = String(fixed.full_description);
+        const fixed = extractJSON(await req.ai.run([{ type: 'text', text: fixPrompt }]));
+        if (typeof fixed?.full_description !== 'string' || !fixed.full_description.trim())
+          throw Object.assign(new Error('invalid AI response'), { code: 'invalid_response' });
+        fullDescription = fixed.full_description.trim();
         analysis = analyzeText(fullDescription);
         if (score(analysis) < score(best.analysis)) best = { text: fullDescription, analysis };
       } catch (e) {
-        console.error('Spam fix failed:', e.message);
+        const failure = aiFailure(e); req.ai.code = failure.code;
+        warning = failure.error + ' Отриманий опис збережено; перевірте зауваження нижче.';
         break;
       }
     }
@@ -496,7 +522,6 @@ Respond STRICTLY as JSON without markdown:
       fullDescription = best.text;
       analysis = best.analysis;
     }
-    console.log(`Spam check result: ${analysis.spam.length === 0 ? 'CLEAN' : 'STILL SPAM: ' + analysis.spam.map(s => `${s.word}(${s.count})`).join(', ')} after ${fixAttempts} fix(es)`);
 
     let shortDescription = String(parsed.short_description || '').trim();
     if (shortDescription.length > 80) {
@@ -511,10 +536,13 @@ Respond STRICTLY as JSON without markdown:
       shortDescription = (shortDescription.length >= 80 ? shortDescription.slice(0, 79).replace(/[,;:\s-]+$/, '') : shortDescription) + '.';
     }
 
+    if (res.destroyed) return;
     res.json({
       shortDescription,
       fullDescription,
       selected,
+      usage: { calls: req.ai.calls, limit: req.ai.limit },
+      ...(warning ? { warning } : {}),
       spamCheck: {
         densityLimit: SPAM_DENSITY,
         totalWords: analysis.totalWords,
@@ -526,9 +554,18 @@ Respond STRICTLY as JSON without markdown:
       }
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Внутрішня помилка сервера: ' + err.message });
+    sendAiFailure(res, err, req.ai);
   }
+});
+
+// Express body-parser otherwise returns HTML for invalid/oversized JSON bodies.
+app.use((error, req, res, next) => {
+  if (!req.path.startsWith('/api/')) return next(error);
+  const oversized = error.type === 'entity.too.large';
+  if (!oversized && error.type !== 'entity.parse.failed')
+    return res.status(500).json({ code: 'server_error', error: 'Сервер тимчасово недоступний. Спробуйте пізніше.' });
+  res.status(oversized ? 413 : 400).json({ code: oversized ? 'payload_too_large' : 'invalid_json',
+    error: oversized ? 'Забагато даних у запиті. Зменште кількість скріншотів.' : 'Не вдалося прочитати дані запиту.' });
 });
 
 // Запускаємо сервер лише при прямому виклику — щоб тести могли підключити модуль
