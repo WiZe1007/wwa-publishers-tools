@@ -1,5 +1,5 @@
 import { FIXED_DATE, isImage, isVideo, stripImageMetadata, stripVideoMetadata } from '../metadata.js';
-import { requestJson } from '../http.js';
+import { requestJson, ensureAIReady } from '../http.js';
 
 // Each tool owns its DOM and state, including while detached during navigation.
 export function mount(root) {
@@ -180,8 +180,10 @@ $('genBtn').onclick = async () => {
   if (state.screenshots.length === 0) { st.className = 'status err'; st.textContent = 'Додайте хоча б один скріншот.'; return; }
 
   $('genBtn').disabled = true;
-  st.innerHTML = '<span class="spinner"></span>Стискаю скріншоти та відправляю в Claude...';
+  st.innerHTML = '<span class="spinner"></span>Підключаю сервер. Безплатний Render може прокидатися до хвилини…';
   try {
+    await ensureAIReady();
+    st.innerHTML = '<span class="spinner"></span>Стискаю скріншоти та відправляю в Claude...';
     const thumbs = [];
     for (const s of state.screenshots) thumbs.push(await compressImage(s.file, 800, 0.72));
 
@@ -265,8 +267,10 @@ $('fixSpamBtn').onclick = async () => {
   if (!text) return;
   $('fixSpamBtn').disabled = true;
   st.className = 'status';
-  st.innerHTML = '<span class="spinner"></span>AI переписує опис без переспаму...';
+  st.innerHTML = '<span class="spinner"></span>Підключаю сервер перед AI-правкою…';
   try {
+    await ensureAIReady();
+    st.innerHTML = '<span class="spinner"></span>AI переписує опис без переспаму...';
     const data = await requestJson('/api/fix-spam', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

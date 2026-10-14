@@ -6,6 +6,7 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const { createAiRequest, aiFailure } = require('./lib/ai-request');
+const { randomUUID } = require('node:crypto');
 
 // Simple .env loader (no dependency needed)
 const envPath = path.join(__dirname, '.env');
@@ -21,6 +22,16 @@ const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.ANTHROPIC_API_KEY || '';
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5';
 
+// Observe arrival before body parsing/AI work, without logging request contents.
+app.use((req, res, next) => {
+  if (['/api/health', '/api/aso', '/api/fix-spam'].includes(req.path)) {
+    const id = randomUUID(), started = Date.now();
+    res.setHeader('X-Request-Id', id);
+    console.info('API received', JSON.stringify({ id, route: req.path, method: req.method }));
+    res.once('finish', () => console.info('API completed', JSON.stringify({ id, status: res.statusCode, durationMs: Date.now() - started })));
+  }
+  next();
+});
 app.use(express.json({ limit: '80mb' }));
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders(res, filePath) {

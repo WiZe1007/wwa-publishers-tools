@@ -28,3 +28,19 @@ export async function requestJson(url, options = {}, { timeoutMs = 120000 } = {}
     throw error;
   } finally { clearTimeout(timer); }
 }
+
+// Wake/check the host BEFORE a paid POST. Cold-start time must not consume the
+// generation deadline or cause users to repeat a potentially billed request.
+export async function ensureAIReady({ timeoutMs = 90000 } = {}) {
+  let health;
+  try {
+    health = await requestJson('/api/health', { cache: 'no-store' }, { timeoutMs });
+  } catch (error) {
+    throw Object.assign(new Error('Не вдалося підключити сервер. AI-запит не надсилався. Ваші дані не змінено.'),
+      { code: 'server_unavailable', cause: error });
+  }
+  if (health.ok !== true)
+    throw Object.assign(new Error('Сервер ще не готовий. AI-запит не надсилався.'), { code: 'server_unavailable' });
+  if (health.aiConfigured !== true)
+    throw Object.assign(new Error('AI на сервері не налаштований. Зверніться до адміністратора. AI-запит не надсилався.'), { code: 'configuration' });
+}

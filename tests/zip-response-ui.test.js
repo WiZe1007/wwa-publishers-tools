@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 
-async function mount(fetch) {
+async function mount(fetch, { health = '{"ok":true,"aiConfigured":true}' } = {}) {
   const elements = new Map();
   function element() {
     return { value: '', textContent: '', innerHTML: '', disabled: false, style: { setProperty() {} },
@@ -12,7 +12,8 @@ async function mount(fetch) {
       querySelector() { return element(); }, appendChild(child) { this.children.push(child); } };
   }
   const $ = id => { if (!elements.has(id)) elements.set(id, element()); return elements.get(id); };
-  const context = vm.createContext({ console, fetch, AbortController, setTimeout, clearTimeout, TypeError,
+  const context = vm.createContext({ console, fetch: (url, options) => url === '/api/health'
+    ? Promise.resolve(new Response(health)) : fetch(url, options), AbortController, setTimeout, clearTimeout, TypeError,
     CSS: { escape: value => value },
     document: { createElement: tag => tag === 'canvas'
       ? { getContext: () => ({ drawImage() {} }), toDataURL: () => 'data:image/jpeg;base64,mock-image' } : element() },
@@ -68,4 +69,17 @@ test('ZIP manual repair preserves the current description after an empty gateway
   await $('fixSpamBtn').onclick();
   assert.equal($('fullDesc').value, 'Previous full description.');
   assert.equal($('fixSpamBtn').disabled, false); assert.match($('spamStatus').textContent, /Сервер не повернув/);
+});
+test('ZIP generation never starts a paid request when the host is not ready', async () => {
+  const $ = await mount(() => assert.fail('No paid request before health succeeds'), { health: '{"ok":false}' });
+  await $('genBtn').onclick();
+  assert.equal($('genBtn').disabled, false);
+  assert.match($('genStatus').textContent, /AI-запит не надсилався/);
+  assert.equal($('fullDesc').value, 'Previous full description.');
+});
+test('ZIP manual repair also checks the host before a paid request', async () => {
+  const $ = await mount(() => assert.fail('No paid request before health succeeds'), { health: '{"ok":false}' });
+  await $('fixSpamBtn').onclick();
+  assert.equal($('fixSpamBtn').disabled, false);
+  assert.match($('spamStatus').textContent, /AI-запит не надсилався/);
 });
