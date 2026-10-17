@@ -39,6 +39,95 @@ test('regional title protects the actual brand in both original descriptions', (
   assert.equal(check(translated, protection).clean, false);
 });
 
+const translationSource = { locale: 'es-419', preserveTitle: false, title: 'Fortune Gems',
+  shortDescription: 'Fortune Gems: Train your memory!', fullDescription: 'Fortune Gems offers matching puzzles.' };
+for (const [locale, title] of [['es-419', 'Gemas de la Fortuna'], ['fr', 'Gemmes de la Fortune'],
+  ['de', 'Glücksjuwelen'], ['ar', 'أحجار الحظ'], ['ja', '幸運の宝石'], ['hi', 'भाग्य के रत्न']]) {
+  test(`unchecked preservation requests name translation in every field: ${locale}`, async t => {
+    const post = await fixture(t, async (content, { system }) => {
+      const payload = JSON.parse(content);
+      assert.deepEqual(payload.namePolicy, { mode: 'translate', originalTitle: 'Fortune Gems' });
+      assert.equal(payload.protectedBrand, undefined);
+      assert.equal(payload.source.preserveTitle, undefined);
+      assert.equal(payload.source.title, translationSource.title);
+      assert.match(system, /NAME TRANSLATION/);
+      assert.match(system, /Translate the app\/game name itself/);
+      assert.match(system, /SAME localized name consistently/);
+      assert.doesNotMatch(system, /preserving.*brand spelling|retaining recognizable brand names/);
+      return JSON.stringify({ title, shortDescription: title, fullDescription: `${title}.` });
+    });
+    const { data, status } = await post({ ...translationSource, locale });
+    assert.equal(status, 200);
+    assert.equal(data.title, title); assert.equal(data.shortDescription, title);
+    assert.equal(data.fullDescription, `${title}.`);
+    assert.equal(data.ready, true, JSON.stringify(data.checks.issues));
+    assert.equal(data.usage.calls, 1);
+  });
+}
+
+test('a saved reference cannot re-enable brand preservation after unchecking', async t => {
+  const post = await fixture(t, async (content, { system }) => {
+    const payload = JSON.parse(content);
+    assert.equal(payload.namePolicy.mode, 'translate');
+    assert.equal(payload.originalReference.preserveTitle, undefined);
+    assert.equal(payload.source.preserveTitle, undefined);
+    assert.equal(payload.protectedBrand, undefined);
+    assert.match(system, /namePolicy overrides any naming preference/);
+    return JSON.stringify({ title: 'Gemas de la Fortuna', shortDescription: 'Entrena tu memoria.', fullDescription: 'Gemas de la Fortuna.' });
+  });
+  const { data } = await post({ ...translationSource, reference: { ...translationSource, preserveTitle: true } });
+  assert.equal(data.title, 'Gemas de la Fortuna'); assert.equal(data.ready, true);
+});
+
+test('optional AI review follows the current name policy rather than an old reference checkbox', async t => {
+  const post = await fixture(t, async (content, { system }) => {
+    const payload = JSON.parse(content);
+    assert.equal(payload.namePolicy.mode, 'translate');
+    if (system.includes('careful app-store copy editor')) {
+      assert.match(system, /do not demand restoration of the original name/);
+      assert.equal(payload.candidate.title, 'Gemas de la Fortuna');
+      return '{"issues":[]}';
+    }
+    return JSON.stringify({ title: 'Gemas de la Fortuna', shortDescription: 'Entrena tu memoria.', fullDescription: 'Gemas de la Fortuna.' });
+  });
+  const { data } = await post({ ...translationSource, qualityReview: true,
+    reference: { ...translationSource, preserveTitle: true } });
+  assert.equal(data.ready, true); assert.equal(data.checks.editor.status, 'passed');
+  assert.equal(data.usage.calls, 2);
+});
+
+test('checked preservation still locks the original in all three fields', async t => {
+  const post = await fixture(t, async (content, { system }) => {
+    const payload = JSON.parse(content), token = payload.protectedBrand.names[0].token;
+    assert.equal(payload.namePolicy.mode, 'preserve');
+    assert.match(system, /BRAND LOCK/); assert.doesNotMatch(system, /NAME TRANSLATION/);
+    return JSON.stringify({ title: 'Gemas de la Fortuna', shortDescription: token, fullDescription: `${token}.` });
+  });
+  const { data } = await post({ ...translationSource, preserveTitle: true });
+  assert.equal(data.title, 'Fortune Gems'); assert.equal(data.shortDescription, 'Fortune Gems');
+  assert.equal(data.fullDescription, 'Fortune Gems.'); assert.equal(data.ready, true);
+});
+
+test('a repetition repair keeps the translated name rather than restoring the original', async t => {
+  const source = { ...translationSource, mode: 'repair', title: 'Gemas de la Fortuna', shortDescription: 'Entrena tu memoria.',
+    fullDescription: 'Gemas de la Fortuna ofrece premios premios premios virtuales.',
+    reference: { ...translationSource, preserveTitle: true } };
+  const post = await fixture(t, async (content, { system }) => {
+    const payload = JSON.parse(content);
+    assert.equal(payload.namePolicy.mode, 'translate');
+    assert.deepEqual(payload.fieldsToRepair, ['fullDescription']);
+    assert.match(system, /NAME TRANSLATION/);
+    assert.match(system, /keep the chosen localized name, not restore the original/);
+    const text = 'Gemas de la Fortuna ofrece recompensas virtuales.';
+    return JSON.stringify(payload.repairPlan ? { replacements: [{ id: 's1', alternatives: [text] }] }
+      : { ...source, fullDescription: text });
+  });
+  const { data } = await post(source);
+  assert.equal(data.title, source.title); assert.equal(data.shortDescription, source.shortDescription);
+  assert.equal(data.fullDescription.includes('Fortune Gems'), false);
+  assert.equal(data.ready, true, JSON.stringify(data.checks.issues));
+});
+
 test('names are masked before translation and restored before checking counts and lengths', () => {
   const protection = createBrandProtection(original), masked = protection.mask(original);
   assert.equal(masked.title, original.title);

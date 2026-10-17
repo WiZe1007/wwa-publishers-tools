@@ -53,7 +53,8 @@
           <label class="fld"><b>Мова результату</b><select id="locale" required disabled><option value="">Завантаження мов…</option></select></label>
           <p id="languageCount" class="hint" role="status" aria-live="polite"></p>
           <label class="fld"><b>Назва додатку / гри</b><input id="sourceTitle" type="text" required maxlength="400" dir="auto" placeholder="Наприклад, Focus Garden"></label>
-          <label class="check localization-preserve"><input id="preserveTitle" type="checkbox" checked> Не перекладати назву та бренд в описах</label>
+          <label class="check localization-preserve"><input id="preserveTitle" type="checkbox" checked aria-describedby="namePolicyHelp"> Не перекладати назву та бренд в описах</label>
+          <p id="namePolicyHelp" class="hint localization-name-help">Назва та її згадки в описах залишаться в оригіналі.</p>
           <label class="check localization-preserve"><input id="qualityReview" type="checkbox" aria-describedby="aiBudgetHelp"> Додаткова AI-перевірка мови (платні запити)</label>
           <p id="aiBudgetHelp" class="hint">Економний режим: до 2 AI-запитів на переклад із виправленням. З додатковою AI-перевіркою — до 4. Перевірка повторів не використовує Claude API.</p>
           <label class="fld"><b>Короткий опис</b><textarea id="sourceShort" required maxlength="1000" rows="3" dir="auto" placeholder="Коротко про головну користь додатку"></textarea></label>
@@ -73,6 +74,7 @@
       <p class="settings-help" id="resultEmpty">Вставте три вихідні тексти та оберіть мову. Тут з’явиться редагований результат і звіт перевірки.</p>
       <fieldset id="resultFields" disabled>
         <label class="fld"><b>Локалізована назва <span class="localization-count" id="titleCount">0 / 30</span></b><input type="text" id="resultTitle" dir="auto"></label>
+        <p id="titleTranslationNotice" class="hint localization-name-help" role="status" hidden></p>
         <label class="fld"><b>Локалізований короткий опис <span class="localization-count" id="shortCount">0 / 80</span></b><textarea id="resultShort" rows="3" dir="auto"></textarea></label>
         <label class="fld"><b>Локалізований повний опис <span class="localization-count" id="fullCount">0 / 4000</span></b><textarea id="resultFull" rows="12" dir="auto"></textarea></label>
       </fieldset>

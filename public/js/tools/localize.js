@@ -47,6 +47,21 @@ export function mount(root) {
   const result = () => ({ ...values(resultIds), locale: resultLocale, profile: profile(), preserveTitle: $('preserveTitle').checked,
     ...(referenceSource ? { reference: referenceSource } : {}) });
   const snapshot = () => JSON.stringify(result());
+  function namePolicyHelp() {
+    $('namePolicyHelp').textContent = $('preserveTitle').checked
+      ? 'Назва та її згадки в описах залишаться в оригіналі.'
+      : 'Назва та її згадки в описах перекладатимуться обраною мовою.';
+  }
+  function titleTranslationNotice() {
+    const normalize = text => text.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+    const original = referenceSource?.title;
+    const unchanged = hasResult && !$('preserveTitle').checked && original &&
+      normalize($('resultTitle').value) === normalize(original);
+    $('titleTranslationNotice').hidden = !unchanged;
+    $('titleTranslationNotice').textContent = unchanged
+      ? 'Назва залишилась без змін. Перевірте її переклад перед публікацією.' : '';
+  }
+  namePolicyHelp();
 
   async function request(path, body, signal) {
     let response;
@@ -96,6 +111,7 @@ export function mount(root) {
       $(countIds[index]).classList.toggle('over-limit', count > limits[index]);
       $(id).setAttribute('aria-invalid', String(count > limits[index]));
     });
+    titleTranslationNotice();
   }
   function stale(message) {
     checkVersion++;
@@ -294,7 +310,12 @@ export function mount(root) {
     if (hasResult) { stale('Профіль змінено. Перевіряємо текст за новими правилами…'); return $('checkResult').onclick(); }
   });
   $('preserveTitle').addEventListener('change', () => {
-    if (hasResult) { stale('Налаштування бренду змінено. Перевіряємо текст…'); return $('checkResult').onclick(); }
+    namePolicyHelp(); titleTranslationNotice();
+    if (hasResult) {
+      $('generationStatus').textContent = 'Налаштування назви змінено. Натисніть «Перекласти та перевірити», щоб оновити назву та описи. Зміна галочки сама не запускає платний переклад.';
+      stale('Налаштування бренду змінено. Перевіряємо текст…');
+      return $('checkResult').onclick();
+    }
   });
   const exportText = () => {
     const data = result();

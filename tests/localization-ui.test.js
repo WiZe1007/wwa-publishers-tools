@@ -79,6 +79,47 @@ test('brand protection is enabled by default with a label that includes descript
   assert.match(html, /Не перекладати назву та бренд в описах/);
 });
 
+test('unchecked checkbox reaches translation and the returned localized title is not overwritten', async () => {
+  const { $, state, generate } = await mount();
+  const translated = { ...valid, title: 'Ogród skupienia', shortDescription: 'Ogród skupienia: Zaplanuj dzień.',
+    fullDescription: 'Ogród skupienia. Wybierz zadanie.' };
+  $('preserveTitle').checked = false;
+  await $('preserveTitle').listeners.change();
+  assert.match($('namePolicyHelp').textContent, /перекладатимуться/);
+  state.respond = async body => {
+    assert.equal(body.preserveTitle, false);
+    return { ...translated, checks: check(translated), ready: true };
+  };
+  await generate();
+  assert.equal($('resultTitle').value, translated.title);
+  assert.equal($('resultShort').value, translated.shortDescription);
+  assert.equal($('titleTranslationNotice').hidden, true);
+});
+
+test('an unchanged name is visible as a notice, without extra paid retries', async () => {
+  const { $, state, generate } = await mount();
+  let calls = 0;
+  state.respond = async () => { calls++; return { ...valid, checks: check(valid), ready: true }; };
+  await generate();
+  assert.equal(calls, 1);
+  assert.equal($('titleTranslationNotice').hidden, false);
+  assert.match($('titleTranslationNotice').textContent, /Назва залишилась без змін/);
+  $('resultTitle').value = 'Ogród skupienia'; $('resultTitle').listeners.input();
+  assert.equal($('titleTranslationNotice').hidden, true);
+});
+
+test('unchecking after a preserved result explains that a new translation is needed and spends nothing', async () => {
+  const { $, state, generate } = await mount();
+  $('preserveTitle').checked = true; await generate();
+  state.respond = () => assert.fail('Changing the checkbox must not pay for translation');
+  $('preserveTitle').checked = false;
+  await $('preserveTitle').listeners.change();
+  assert.match($('generationStatus').textContent, /Перекласти та перевірити/);
+  assert.match($('generationStatus').textContent, /сама не запускає платний переклад/);
+  assert.equal($('titleTranslationNotice').hidden, false);
+  assert.equal($('resultTitle').value, valid.title);
+});
+
 test('free checks detect deleted brands using the saved original, not changed source fields', async () => {
   const { $, state, generate } = await mount();
   const branded = { ...valid, shortDescription: 'Focus Garden: Zaplanuj spokojny dzień.', fullDescription: 'Focus Garden. Wybierz zadanie.' };
