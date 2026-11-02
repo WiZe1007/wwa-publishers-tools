@@ -33,6 +33,22 @@ test('encoded tags stay visible text and mismatched emphasis is balanced safely'
   assert.equal(formatDescription('Score < 20 & time > 5').text, 'Score < 20 & time > 5');
 });
 
+test('rich opener makes at most two sentences red and bold without changing the rest', () => {
+  const { emphasizeOpening } = require('../public/js/description-format');
+  assert.equal(emphasizeOpening('<font color="blue">Explore the stars. Find your rhythm. Keep going.</font>\n\n<b>Features</b>\nPlay offline.'),
+    '<b><font color="#D32F2F">Explore the stars. Find your rhythm.</font></b> Keep going.\n\n<b>Features</b>\nPlay offline.');
+  const once = emphasizeOpening('<i>Explore &amp; discover!</i>\n\nDetails.');
+  assert.equal(once, '<b><font color="#D32F2F">Explore &amp; discover!</font></b>\n\nDetails.');
+  assert.equal(emphasizeOpening(once), once);
+});
+test('red opener preserves visible text and formatting spanning the paragraph boundary', () => {
+  const { emphasizeOpening, formatDescription } = require('../public/js/description-format');
+  const source = '<b>First sentence.\n\nSecond paragraph.</b>';
+  const result = emphasizeOpening(source);
+  assert.equal(formatDescription(result).text, 'First sentence.\n\nSecond paragraph.');
+  assert.match(result, /\n\n<b>Second paragraph\.<\/b>$/);
+});
+
 for (const [label, input] of [
   ['unclosed angle brackets', "'<'.repeat(100000)"],
   ['unmatched closing tags after deep nesting', "'<b>'.repeat(100000) + '</i>'.repeat(100000)"]

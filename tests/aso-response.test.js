@@ -31,13 +31,15 @@ test('ASO successful generation returns both fields and makes one provider call'
 
 test('rich HTML style reaches generation and repair while markup never dilutes repetition counts', async t => {
   let calls = 0;
-  const richDraft = '<b><font color="#1D4ED8">Explore gardens</font></b>\n' + cleanText;
+  const richDraft = '<b><font color="#D32F2F">Explore gardens.</font></b>\n\n' + cleanText;
   const post = await fixture(t, async content => {
     const prompt = content.find(block => block.type === 'text').text;
     assert.match(prompt, /ASO RICH HTML/);
     assert.match(prompt, /<b>/);
+    assert.match(prompt, /#D32F2F/);
+    if (calls === 0) assert.match(prompt, /КРОК 1 — КЛЮЧОВІ СЛОВА/);
     if (++calls === 1) return JSON.stringify({ short_description: '<b>Demo</b>: Explore.', full_description: '<b>orchard</b> '.repeat(8) + cleanText });
-    return JSON.stringify({ full_description: richDraft });
+    return JSON.stringify({ full_description: '<i>Explore gardens.</i>\n\n' + cleanText });
   });
   const { status, data } = await post('/api/aso', { ...body, tone: 'aso_rich_html' });
   assert.equal(status, 200);
@@ -91,6 +93,15 @@ test('manual spam repair also stops at two calls and preserves its best text', a
   const { status, data } = await post('/api/fix-spam', { appName: 'Demo', text: spamText });
   assert.equal(status, 200); assert.equal(calls, 2); assert.equal(data.fullDescription, spamText);
   assert.equal(data.spamCheck.clean, false);
+});
+test('manual repair restores the red bold opening when AI drops its formatting', async t => {
+  const post = await fixture(t, async () => JSON.stringify({ full_description: '<i>Explore gardens.</i>\n\n' + cleanText }));
+  const { status, data } = await post('/api/fix-spam', {
+    text: '<b><font color="#D32F2F">' + 'orchard '.repeat(8) + '</font></b>\n\n' + cleanText
+  });
+  assert.equal(status, 200);
+  assert.equal(data.fullDescription, '<b><font color="#D32F2F">Explore gardens.</font></b>\n\n' + cleanText);
+  assert.equal(data.fixAttempts, 1);
 });
 test('manual repair provider failure keeps the input and shows a warning', async t => {
   const post = await fixture(t, async () => { throw new TypeError('private network detail'); });

@@ -7,7 +7,7 @@ const path = require('path');
 const fs = require('fs');
 const { createAiRequest, aiFailure } = require('./lib/ai-request');
 const { randomUUID } = require('node:crypto');
-const { formatDescription } = require('./public/js/description-format');
+const { formatDescription, emphasizeOpening } = require('./public/js/description-format');
 
 // Simple .env loader (no dependency needed)
 const envPath = path.join(__dirname, '.env');
@@ -134,13 +134,10 @@ const wordFrequency = text => analyzeText(text).frequency;
 const findSpam = text => analyzeText(text).spam;
 
 // ===== Стилі опису =====
-const RICH_FORMAT_RULES = `ASO RICH HTML formatting: preserve a polished, readable full description using ONLY <b>, <i>, <u>, <font color="#1D4ED8">, <font color="#0F766E"> and their closing tags. Use actual newlines between sections, not HTML layout tags. Never use CSS, style attributes, links, images, scripts or markdown.
-Use bold section headings and short benefit labels, italics for one supporting sentence, underline only ONE brief key benefit, and at most TWO accent colors. Combine bold + color on 2-3 headings, e.g. <b><font color="#1D4ED8">Explore at your pace</font></b>. Keep body paragraphs plain, never color whole paragraphs or underline headings. Use every emphasis type purposefully, not all on the same phrase. Close and nest every tag correctly. Formatting tags and attributes do NOT count as words for repetition analysis, but DO count toward the character limit. Avoid repeating words in headings and body. Preserve all facts, negations, named controls and limitations. Never invent features.`;
+const RICH_FORMAT_RULES = `ASO RICH HTML formatting: preserve a polished, readable full description using ONLY <b>, <i>, <u>, <font color="#D32F2F">, <font color="#0F766E"> and their closing tags. Use actual newlines between sections, not HTML layout tags. Never use CSS, style attributes, links, images, scripts or markdown.
+Start with 1-2 complete, compelling sentences as the FIRST paragraph, wrapped together in <b><font color="#D32F2F">...</font></b>: the opening must be RED AND BOLD. Do not put a separate heading before it. Preserve this red bold opening during every rewrite.
+Use bold section headings and short benefit labels, italics for one supporting sentence, underline only ONE brief key benefit, and at most TWO accent colors: red for the opening and teal for 2-3 section headings, e.g. <b><font color="#0F766E">Explore at your pace</font></b>. After the opening, keep body paragraphs plain, never color whole paragraphs or underline headings. Use every emphasis type purposefully, not all on the same phrase. Close and nest every tag correctly. Formatting tags and attributes do NOT count as words for repetition analysis, but DO count toward the character limit. Avoid repeating words in headings and body. Preserve all facts, negations, named controls and limitations. Never invent features.`;
 const TONE_INSTRUCTIONS = {
-  aso_rich_html: `Стиль опису — ASO RICH HTML: виразний, насичений і професійний опис із продуманою типографікою.
-Почни з короткого змістовного хука з назвою додатку та його реальною перевагою. Далі 3-4 компактні секції: як це працює, підтверджені можливості та переваги, важливі умови. Заверши одним природним запрошенням спробувати. Для невеликого обсягу об'єднай секції; якість і факти важливіші за кількість блоків. Емодзі — до 3-4 на весь опис, переважно поруч із заголовками. Без порожніх рекламних фраз, перебільшень, штучного добивання довжини та переспаму. Назву використовуй природно, 1-3 рази.
-${RICH_FORMAT_RULES}
-Return the full_description as an HTML-formatted string INSIDE valid JSON. The short_description MUST remain plain text with no HTML or emojis. Respect the requested size INCLUDING all markup. Do not disclose any analysis or formatting instructions.`,
   normal: `Стиль опису — ЗВИЧАЙНИЙ:
 - Спокійний, дружній, інформативний тон.
 - Чітко і чесно описуй функції, без маркетингового тиску.
@@ -272,6 +269,14 @@ In-App Purchases: No in-app purchases are available. 18+. For entertainment purp
 - Але БЕЗ порушень правил Google Play: без обману, без КАПСУ, без "!!!", без фейкових обіцянок та вигаданих цифр — драйв досягається мовою, а не порушеннями.`
 };
 
+// Rich HTML inherits the actual ASO Pro methodology instead of a separate copy.
+TONE_INSTRUCTIONS.aso_rich_html = `${TONE_INSTRUCTIONS.aso_pro}
+
+Стиль опису — ASO RICH HTML (ASO PRO + ОФОРМЛЕННЯ). Повністю збережи базу ASO Pro вище: семантичне ядро, природні ключі в short description, хук, буліти функцій із вигодами, як користуватися, CTA та фінальний ключовий абзац. Усі факти й уточнення — лише з опису розробника та скріншотів. Не додавай окрему альтернативну структуру. Для невеликого обсягу стискай блоки без вигадування чи втрати фактів.
+Єдина зміна вступу: 1–2 речення замість 2–3, червоні та жирні. Головне ключове слово має бути в перших 167 символах ВИДИМОГО тексту без HTML-тегів.
+${RICH_FORMAT_RULES}
+Return the full_description as an HTML-formatted string INSIDE valid JSON. The short_description MUST remain plain text with no HTML or emojis. Respect the requested size INCLUDING all markup. Do not disclose any analysis or formatting instructions.`;
+
 // ===== Обсяг повного опису =====
 // Максимум повторів одного слова: щільність ≤ SPAM_DENSITY% від очікуваної кількості слів,
 // мінус 1 як запас міцності (слова ≈ 6.2 символи з пробілом)
@@ -355,6 +360,7 @@ app.post('/api/fix-spam', aiRequest, async (req, res) => {
     let text = String((req.body || {}).text || '').trim();
     const appName = String((req.body || {}).appName || 'the app');
     if (!text) return res.status(400).json({ error: 'Текст порожній.' });
+    const preserveRedOpening = /^<b>\s*<font\s+color=["'](?:#d32f2f|red)["']>/i.test(text);
 
     let analysis = analyzeText(text);
     if (analysis.spam.length === 0) {
@@ -395,6 +401,7 @@ Respond STRICTLY as JSON without markdown:
         break;
       }
       text = fixed.full_description.trim();
+      if (preserveRedOpening) text = emphasizeOpening(text);
       analysis = analyzeText(text);
       if (scoreOf(analysis) < scoreOf(best.analysis)) best = { text, analysis };
     }
@@ -511,6 +518,7 @@ ${TONE_INSTRUCTIONS[tone] || TONE_INSTRUCTIONS.normal}
 
     // ===== Перевірка довгого опису на переспам + автовиправлення =====
     let fullDescription = String(parsed.full_description || '');
+    if (tone === 'aso_rich_html') fullDescription = emphasizeOpening(fullDescription);
     let analysis = analyzeText(fullDescription);
     let fixAttempts = 0;
     const MAX_FIX = req.ai.limit - req.ai.calls;
@@ -553,6 +561,7 @@ Respond STRICTLY as JSON without markdown:
         if (typeof fixed?.full_description !== 'string' || !fixed.full_description.trim())
           throw Object.assign(new Error('invalid AI response'), { code: 'invalid_response' });
         fullDescription = fixed.full_description.trim();
+        if (tone === 'aso_rich_html') fullDescription = emphasizeOpening(fullDescription);
         analysis = analyzeText(fullDescription);
         if (score(analysis) < score(best.analysis)) best = { text: fullDescription, analysis };
       } catch (e) {
