@@ -28,6 +28,25 @@ test('ASO successful generation returns both fields and makes one provider call'
   assert.equal(status, 200); assert.equal(calls, 1); assert.equal(data.usage.limit, 2);
   assert.equal(data.fullDescription, cleanText); assert.equal(data.shortDescription, draft.short_description);
 });
+
+test('rich HTML style reaches generation and repair while markup never dilutes repetition counts', async t => {
+  let calls = 0;
+  const richDraft = '<b><font color="#1D4ED8">Explore gardens</font></b>\n' + cleanText;
+  const post = await fixture(t, async content => {
+    const prompt = content.find(block => block.type === 'text').text;
+    assert.match(prompt, /ASO RICH HTML/);
+    assert.match(prompt, /<b>/);
+    if (++calls === 1) return JSON.stringify({ short_description: '<b>Demo</b>: Explore.', full_description: '<b>orchard</b> '.repeat(8) + cleanText });
+    return JSON.stringify({ full_description: richDraft });
+  });
+  const { status, data } = await post('/api/aso', { ...body, tone: 'aso_rich_html' });
+  assert.equal(status, 200);
+  assert.equal(calls, 2);
+  assert.equal(data.fullDescription, richDraft);
+  assert.equal(data.shortDescription, 'Demo: Explore.');
+  assert.equal(data.spamCheck.totalWords, 82);
+  assert.equal(data.spamCheck.clean, true);
+});
 for (const output of ['', '{"short_description":', '{}', 'null', '{"short_description":"Demo.","full_description":7}']) {
   test(`ASO rejects incomplete model data without an automatic paid retry: ${output || 'empty'}`, async t => {
     let calls = 0;

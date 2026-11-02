@@ -178,8 +178,13 @@
         <b>TikTok × ASO Pro (ТОП)</b>
         <p>Максимум органіки: повна ASO-методологія + compliance-блоки social casino. Ядро ключів, long-tail, семантика — для топу Google Play.</p>
       </div>
+      <div class="tone" data-tone="aso_rich_html" data-color="#38bdf8">
+        <span class="t-emoji">🎨</span>
+        <b>ASO Rich HTML</b>
+        <p>Виразні заголовки, жирні акценти, курсив, підкреслення та колір. Насичений опис із попереднім переглядом і готовим HTML.</p>
+      </div>
     </div>
-    <p class="hint" style="margin-bottom:14px">Усі стилі безпечні для Google Play: без обману, вигаданих функцій, КАПСУ та заборонених заяв типу «додаток №1».</p>
+    <p class="hint" style="margin-bottom:14px">Усі стилі спираються на ваш опис і скріншоти: без вигаданих функцій, КАПСУ та заяв типу «додаток №1». Перед публікацією перевірте результат.</p>
 
     <label class="fld" style="margin-bottom:6px"><b>Обсяг повного опису</b></label>
     <div class="tones" id="sizes">
@@ -215,6 +220,17 @@
       <label class="fld"><b>Full description <span class="hint" id="fullCount" style="display:inline"></span></b>
         <textarea id="fullDesc" style="min-height:220px"></textarea>
       </label>
+      <details class="description-preview-panel" id="descriptionPreviewPanel" hidden open>
+        <summary>Попередній перегляд опису</summary>
+        <div class="row description-copy-actions">
+          <button class="btn small secondary" id="copyHtmlBtn" type="button">Копіювати HTML</button>
+          <button class="btn small secondary" id="copyPlainBtn" type="button">Копіювати лише текст</button>
+          <span class="hint" id="descriptionVisibleCount"></span>
+        </div>
+        <div class="description-preview" id="descriptionPreview" role="region" aria-label="Оформлений повний опис" tabindex="0" dir="auto"></div>
+        <p class="hint">HTML зберігається у ZIP. Назва та короткий опис — без тегів. Вигляд у Google Play може відрізнятися.</p>
+        <div class="status" id="descriptionCopyStatus" role="status" aria-live="polite"></div>
+      </details>
       <div class="row">
         <button class="btn small secondary" id="spamBtn">🔍 Перевірити на переспам</button>
         <button class="btn small secondary" id="fixSpamBtn" style="display:none">🛠 Виправити переспам (AI)</button>

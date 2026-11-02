@@ -109,10 +109,10 @@ describe('Токенізація', () => {
 describe('Стилі та обсяги опису', () => {
   const EXPECTED_TONES = [
     'normal', 'normal_plus', 'semi', 'aggressive',
-    'aso_pro', 'aso_pro_alt', 'tiktok_aso_pro', 'tiktok_aso_max'
+    'aso_pro', 'aso_pro_alt', 'tiktok_aso_pro', 'tiktok_aso_max', 'aso_rich_html'
   ];
 
-  test('усі 8 стилів мають інструкції', () => {
+  test('усі стилі мають інструкції', () => {
     for (const tone of EXPECTED_TONES) {
       assert.ok(TONE_INSTRUCTIONS[tone], `немає інструкції для стилю ${tone}`);
       assert.ok(TONE_INSTRUCTIONS[tone].length > 100, `інструкція ${tone} підозріло коротка`);

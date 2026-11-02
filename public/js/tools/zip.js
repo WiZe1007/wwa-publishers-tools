@@ -1,5 +1,7 @@
 import { FIXED_DATE, isImage, isVideo, stripImageMetadata, stripVideoMetadata } from '../metadata.js';
 import { requestJson, ensureAIReady } from '../http.js';
+import '../description-format.js';
+const { formatDescription } = globalThis.WWADescriptionFormat;
 
 // Each tool owns its DOM and state, including while detached during navigation.
 export function mount(root) {
@@ -141,6 +143,7 @@ root.querySelectorAll('#tones .tone').forEach(t => {
     root.querySelectorAll('#tones .tone').forEach(x => x.classList.remove('sel'));
     t.classList.add('sel');
     tone = t.dataset.tone;
+    updFullCount();
   };
 });
 
@@ -161,9 +164,29 @@ $('fullDesc').addEventListener('input', updFullCount);
 function updFullCount() {
   const len = $('fullDesc').value.length;
   const max = SIZE_MAX[descSize];
-  $('fullCount').textContent = `(${len} символів, ціль ≤ ${max})`;
+  const formatted = formatDescription($('fullDesc').value);
+  $('fullCount').textContent = `(${len} символів${formatted.hasMarkup ? ' з HTML' : ''}, ціль ≤ ${max})`;
   $('fullCount').style.color = len > max ? 'var(--red)' : '';
+  $('descriptionPreviewPanel').hidden = !formatted.hasMarkup && tone !== 'aso_rich_html';
+  $('descriptionPreview').innerHTML = formatted.html;
+  $('descriptionVisibleCount').textContent = `${Array.from(formatted.text).length} символів без тегів`;
+  $('descriptionCopyStatus').textContent = '';
 }
+
+async function copyDescription(plain) {
+  const status = $('descriptionCopyStatus');
+  try {
+    const source = $('fullDesc').value;
+    await navigator.clipboard.writeText(plain ? formatDescription(source).text : source);
+    status.className = 'status ok';
+    status.textContent = plain ? 'Текст скопійовано.' : 'HTML скопійовано.';
+  } catch {
+    status.className = 'status err';
+    status.textContent = 'Не вдалося скопіювати. Виділіть опис у полі вище та скопіюйте вручну.';
+  }
+}
+$('copyHtmlBtn').onclick = () => copyDescription(false);
+$('copyPlainBtn').onclick = () => copyDescription(true);
 
 // ================= Short description counter =================
 $('shortDesc').addEventListener('input', updCount);

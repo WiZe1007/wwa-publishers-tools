@@ -7,6 +7,7 @@ const path = require('path');
 const fs = require('fs');
 const { createAiRequest, aiFailure } = require('./lib/ai-request');
 const { randomUUID } = require('node:crypto');
+const { formatDescription } = require('./public/js/description-format');
 
 // Simple .env loader (no dependency needed)
 const envPath = path.join(__dirname, '.env');
@@ -104,7 +105,7 @@ function tokenize(text) {
 }
 
 function analyzeText(text) {
-  const tokens = tokenize(text);
+  const tokens = tokenize(formatDescription(text).text);
   const totalWords = tokens.length; // всі слова, включно зі стоп-словами (як в ASOMobile)
   const freq = {};
   const forms = {};
@@ -133,7 +134,13 @@ const wordFrequency = text => analyzeText(text).frequency;
 const findSpam = text => analyzeText(text).spam;
 
 // ===== Стилі опису =====
+const RICH_FORMAT_RULES = `ASO RICH HTML formatting: preserve a polished, readable full description using ONLY <b>, <i>, <u>, <font color="#1D4ED8">, <font color="#0F766E"> and their closing tags. Use actual newlines between sections, not HTML layout tags. Never use CSS, style attributes, links, images, scripts or markdown.
+Use bold section headings and short benefit labels, italics for one supporting sentence, underline only ONE brief key benefit, and at most TWO accent colors. Combine bold + color on 2-3 headings, e.g. <b><font color="#1D4ED8">Explore at your pace</font></b>. Keep body paragraphs plain, never color whole paragraphs or underline headings. Use every emphasis type purposefully, not all on the same phrase. Close and nest every tag correctly. Formatting tags and attributes do NOT count as words for repetition analysis, but DO count toward the character limit. Avoid repeating words in headings and body. Preserve all facts, negations, named controls and limitations. Never invent features.`;
 const TONE_INSTRUCTIONS = {
+  aso_rich_html: `Стиль опису — ASO RICH HTML: виразний, насичений і професійний опис із продуманою типографікою.
+Почни з короткого змістовного хука з назвою додатку та його реальною перевагою. Далі 3-4 компактні секції: як це працює, підтверджені можливості та переваги, важливі умови. Заверши одним природним запрошенням спробувати. Для невеликого обсягу об'єднай секції; якість і факти важливіші за кількість блоків. Емодзі — до 3-4 на весь опис, переважно поруч із заголовками. Без порожніх рекламних фраз, перебільшень, штучного добивання довжини та переспаму. Назву використовуй природно, 1-3 рази.
+${RICH_FORMAT_RULES}
+Return the full_description as an HTML-formatted string INSIDE valid JSON. The short_description MUST remain plain text with no HTML or emojis. Respect the requested size INCLUDING all markup. Do not disclose any analysis or formatting instructions.`,
   normal: `Стиль опису — ЗВИЧАЙНИЙ:
 - Спокійний, дружній, інформативний тон.
 - Чітко і чесно описуй функції, без маркетингового тиску.
@@ -370,6 +377,7 @@ Over-used words:
 ${analysis.spam.map(s => `- "${s.word}" — used ${s.count} times (${s.density}%), must appear at most ${safeMax} times`).join('\n')}
 
 Rewrite so every listed word appears at most ${safeMax} times. Keep the meaning, features, structure, emojis, formatting and overall length unchanged. Do not add features. Before answering, count the occurrences in your rewrite and fix again if any is still above the limit.
+${formatDescription(text).hasMarkup ? RICH_FORMAT_RULES : ''}
 
 Description:
 ${text}
@@ -533,7 +541,7 @@ Rewrite the description so that:
 2. The meaning, features and overall length stay the same.
 3. Do NOT add features that are not mentioned.
 4. Keep it natural, high-quality English for Google Play.
-5. Keep the same marketing tone and energy as the original text, including all emojis and formatting.${tone === 'aso_pro_alt' ? '\n6. Do NOT include any question and answer about an internet connection, network access or offline play (including "Q: Do I need an internet connection? A: ..."). Preserve other supported Q&A topics.' : ''}${(tone === 'tiktok_aso_pro' || tone === 'tiktok_aso_max') ? `
+5. Keep the same marketing tone and energy as the original text, including all emojis and formatting.${tone === 'aso_rich_html' ? `\n${RICH_FORMAT_RULES}\nKeep the full_description within the requested size INCLUDING markup: ${SIZE_INSTRUCTIONS[size] || SIZE_INSTRUCTIONS.small}` : ''}${tone === 'aso_pro_alt' ? '\n6. Do NOT include any question and answer about an internet connection, network access or offline play (including "Q: Do I need an internet connection? A: ..."). Preserve other supported Q&A topics.' : ''}${(tone === 'tiktok_aso_pro' || tone === 'tiktok_aso_max') ? `
 6. CRITICAL: Do NOT modify the mandatory compliance sentences ("Cash Out Rules: Real-money cash-outs are strictly blocked..." and "In-App Purchases: ...") and do NOT remove the required phrases: "social casino experience", "simulated luck", "virtual progress", "Players interact with virtual elements", "do not represent real-money gambling". Reduce word repetition ONLY in other parts of the text.` : ''}
 
 Description:
@@ -561,6 +569,7 @@ Respond STRICTLY as JSON without markdown:
     }
 
     let shortDescription = String(parsed.short_description || '').trim();
+    if (tone === 'aso_rich_html') shortDescription = formatDescription(shortDescription).text.trim();
     if (shortDescription.length > 80) {
       shortDescription = shortDescription.slice(0, 80);
       const cut = shortDescription.lastIndexOf(' ');

@@ -3,18 +3,19 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 
-async function mount(fetch, { health = '{"ok":true,"aiConfigured":true}' } = {}) {
+async function mount(fetch, { health = '{"ok":true,"aiConfigured":true}', clipboard = [] } = {}) {
   const elements = new Map();
   function element() {
     return { value: '', textContent: '', innerHTML: '', disabled: false, style: { setProperty() {} },
       dataset: {}, classList: { add() {}, remove() {}, toggle() {} }, children: [], listeners: {},
-      addEventListener(name, callback) { this.listeners[name] = callback; },
+      addEventListener(name, callback) { const previous = this.listeners[name]; this.listeners[name] = (...args) => { previous?.(...args); callback(...args); }; },
       querySelector() { return element(); }, appendChild(child) { this.children.push(child); } };
   }
   const $ = id => { if (!elements.has(id)) elements.set(id, element()); return elements.get(id); };
   const context = vm.createContext({ console, fetch: (url, options) => url === '/api/health'
     ? Promise.resolve(new Response(health)) : fetch(url, options), AbortController, setTimeout, clearTimeout, TypeError,
     CSS: { escape: value => value },
+    navigator: { clipboard: { writeText: async value => { clipboard.push(value); } } },
     document: { createElement: tag => tag === 'canvas'
       ? { getContext: () => ({ drawImage() {} }), toDataURL: () => 'data:image/jpeg;base64,mock-image' } : element() },
     URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} },
@@ -26,8 +27,10 @@ async function mount(fetch, { health = '{"ok":true,"aiConfigured":true}' } = {})
   }, { context });
   const http = new vm.SourceTextModule(fs.readFileSync('public/js/http.js', 'utf8'), { context });
   await http.link(() => {});
+  const descriptionFormat = new vm.SourceTextModule(fs.readFileSync('public/js/description-format.js', 'utf8'), { context });
+  await descriptionFormat.link(() => {});
   const module = new vm.SourceTextModule(fs.readFileSync('public/js/tools/zip.js', 'utf8'), { context });
-  await module.link(specifier => specifier === '../http.js' ? http : metadata); await module.evaluate();
+  await module.link(specifier => specifier === '../http.js' ? http : specifier === '../description-format.js' ? descriptionFormat : metadata); await module.evaluate();
   module.namespace.mount({ querySelector: selector => $(selector.slice(1)), querySelectorAll: () => [] });
   $('appName').value = 'Demo'; $('devDescription').value = 'A private offline garden guide.';
   $('shortDesc').value = 'Previous short.'; $('fullDesc').value = 'Previous full description.';
@@ -52,6 +55,22 @@ test('ZIP successful response fills both descriptions and unlocks its button', a
   assert.equal($('shortDesc').value, 'Demo: Choose tasks.');
   assert.equal($('fullDesc').value, 'Choose tasks. Track progress.');
   assert.equal($('genBtn').disabled, false); assert.equal($('asoResults').style.display, '');
+});
+test('ZIP rich result previews safe formatting and copies both original HTML and visible text', async () => {
+  const clipboard = [];
+  const html = '<b><font color="red">Explore</font></b>\n<i>At your pace</i> <u>offline</u>';
+  const $ = await mount(async () => new Response(JSON.stringify({ shortDescription: 'Demo: Explore.', fullDescription: html })), { clipboard });
+  await $('genBtn').onclick();
+  assert.equal($('descriptionPreviewPanel').hidden, false);
+  assert.equal($('descriptionPreview').innerHTML, html);
+  assert.match($('fullCount').textContent, /HTML/);
+  await $('copyHtmlBtn').onclick();
+  await $('copyPlainBtn').onclick();
+  assert.deepEqual(clipboard, [html, 'Explore\nAt your pace offline']);
+  $('fullDesc').value = '<img src=x onerror=alert(1)><b>Updated</b>';
+  $('fullDesc').listeners.input();
+  assert.doesNotMatch($('descriptionPreview').innerHTML, /<img/);
+  assert.match($('descriptionPreview').innerHTML, /<b>Updated<\/b>/);
 });
 test('ZIP keeps a valid partial result and displays the server warning', async () => {
   const $ = await mount(async () => new Response(JSON.stringify({ shortDescription: 'Demo: Choose tasks.', fullDescription: 'Choose tasks. Track progress.',
