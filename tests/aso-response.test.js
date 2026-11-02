@@ -39,6 +39,7 @@ for (const output of ['', '{"short_description":', '{}', 'null', '{"short_descri
 }
 for (const [error, status, code] of [
   [{ code: 'timeout' }, 504, 'timeout'], [{ status: 401 }, 503, 'configuration'],
+  [{ code: 'output_limit' }, 502, 'output_limit'],
   [{ status: 429 }, 429, 'rate_limit'], [{}, 502, 'provider_error']
 ]) test(`ASO failure ${code} returns safe structured JSON and stops`, async t => {
   let calls = 0;

@@ -281,7 +281,7 @@ const SIZE_INSTRUCTIONS = {
 };
 
 // Виклик Claude API
-async function callClaude(content, { system, signal, onUsage } = {}) {
+async function callClaude(content, { system, signal, onUsage, schema } = {}) {
   const resp = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     signal,
@@ -296,6 +296,7 @@ async function callClaude(content, { system, signal, onUsage } = {}) {
       // Sonnet 5.5 otherwise enables adaptive thinking by default. This app
       // makes single-turn, tool-free requests; retain its previous text budget.
       ...(MODEL === 'claude-sonnet-5-5' ? { thinking: { type: 'between_tools' } } : {}),
+      ...(schema ? { output_config: { format: { type: 'json_schema', schema } } } : {}),
       ...(system ? { system } : {}),
       messages: [{ role: 'user', content }]
     })
@@ -307,9 +308,29 @@ async function callClaude(content, { system, signal, onUsage } = {}) {
   }
   const data = await resp.json();
   if (data.usage) onUsage?.(data.usage);
+  const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+  // Diagnostic metadata only: never persist prompts, descriptions, images or keys.
+  console.info('Claude response', JSON.stringify({ model: MODEL, stopReason: data.stop_reason,
+    inputTokens: data.usage?.input_tokens, outputTokens: data.usage?.output_tokens, textChars: text.length }));
   if (data.stop_reason === 'max_tokens')
-    throw Object.assign(new SyntaxError('Invalid AI response: output token limit reached'), { code: 'invalid_response' });
-  return (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+    throw Object.assign(new Error('AI output token limit reached'), { code: 'output_limit' });
+  return text;
+}
+
+const DESCRIPTION_SCHEMA = {
+  type: 'object', properties: { full_description: { type: 'string' } },
+  required: ['full_description'], additionalProperties: false
+};
+
+function asoSchema(needSelection) {
+  return {
+    type: 'object', properties: {
+      short_description: { type: 'string' }, full_description: { type: 'string' },
+      ...(needSelection ? { selected: { type: 'array', items: { type: 'integer' } } } : {})
+    },
+    required: ['short_description', 'full_description', ...(needSelection ? ['selected'] : [])],
+    additionalProperties: false
+  };
 }
 
 function extractJSON(text) {
@@ -357,7 +378,7 @@ Respond STRICTLY as JSON without markdown:
 {"full_description": "..."}`;
       let fixed;
       try {
-        fixed = extractJSON(await req.ai.run([{ type: 'text', text: prompt }]));
+        fixed = extractJSON(await req.ai.run([{ type: 'text', text: prompt }], { schema: DESCRIPTION_SCHEMA }));
         if (typeof fixed?.full_description !== 'string' || !fixed.full_description.trim())
           throw Object.assign(new Error('invalid AI response'), { code: 'invalid_response' });
       } catch (error) {
@@ -460,7 +481,7 @@ ${TONE_INSTRUCTIONS[tone] || TONE_INSTRUCTIONS.normal}
 
     let parsed;
     try {
-      parsed = extractJSON(await req.ai.run(content));
+      parsed = extractJSON(await req.ai.run(content, { schema: asoSchema(needSelection) }));
       if (typeof parsed?.short_description !== 'string' || !parsed.short_description.trim() ||
           typeof parsed?.full_description !== 'string' || !parsed.full_description.trim())
         throw Object.assign(new Error('invalid AI response'), { code: 'invalid_response' });
@@ -520,7 +541,7 @@ ${fullDescription}
 
 Respond STRICTLY as JSON without markdown:
 {"full_description": "..."}`;
-        const fixed = extractJSON(await req.ai.run([{ type: 'text', text: fixPrompt }]));
+        const fixed = extractJSON(await req.ai.run([{ type: 'text', text: fixPrompt }], { schema: DESCRIPTION_SCHEMA }));
         if (typeof fixed?.full_description !== 'string' || !fixed.full_description.trim())
           throw Object.assign(new Error('invalid AI response'), { code: 'invalid_response' });
         fullDescription = fixed.full_description.trim();
