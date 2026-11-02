@@ -4,7 +4,8 @@ const { execFileSync } = require('node:child_process');
 
 // Never contact a paid provider or depend on a developer's real credentials.
 process.env.ANTHROPIC_API_KEY = 'test-key-not-real';
-delete process.env.ANTHROPIC_MODEL;
+// Pin the tested model so a developer's optional .env override cannot change it.
+process.env.ANTHROPIC_MODEL = 'claude-sonnet-5-5';
 const { app } = require('../server');
 const actualFetch = global.fetch;
 const text = Array.from({ length: 80 }, (_, i) => `detail${i}`).join(' ');
