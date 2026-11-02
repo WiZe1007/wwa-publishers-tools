@@ -20,7 +20,7 @@ if (fs.existsSync(envPath)) {
 const app = express();
 const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.ANTHROPIC_API_KEY || '';
-const MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5';
+const MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5';
 
 // Observe arrival before body parsing/AI work, without logging request contents.
 app.use((req, res, next) => {
@@ -43,7 +43,7 @@ app.use(express.static(path.join(__dirname, 'public'), {
 }));
 
 app.get('/api/health', (req, res) => {
-  res.json({ ok: true, aiConfigured: Boolean(API_KEY) });
+  res.json({ ok: true, aiConfigured: Boolean(API_KEY), model: MODEL });
 });
 
 // Injectable provider boundary for tests; no client can change these values.
@@ -293,6 +293,9 @@ async function callClaude(content, { system, signal, onUsage } = {}) {
     body: JSON.stringify({
       model: MODEL,
       max_tokens: 4000,
+      // Sonnet 5.5 otherwise enables adaptive thinking by default. This app
+      // makes single-turn, tool-free requests; retain its previous text budget.
+      ...(MODEL === 'claude-sonnet-5-5' ? { thinking: { type: 'between_tools' } } : {}),
       ...(system ? { system } : {}),
       messages: [{ role: 'user', content }]
     })
@@ -304,6 +307,8 @@ async function callClaude(content, { system, signal, onUsage } = {}) {
   }
   const data = await resp.json();
   if (data.usage) onUsage?.(data.usage);
+  if (data.stop_reason === 'max_tokens')
+    throw Object.assign(new SyntaxError('Invalid AI response: output token limit reached'), { code: 'invalid_response' });
   return (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
 }
 
@@ -583,6 +588,7 @@ app.use((error, req, res, next) => {
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`WWA Publishers Tools running on http://localhost:${PORT}`);
+    console.log(`Claude model: ${MODEL}`);
     if (!API_KEY) console.warn('⚠  ANTHROPIC_API_KEY не заданий — сторінка ZIP Creating не зможе генерувати описи.');
   });
 }
