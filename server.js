@@ -8,6 +8,9 @@ const fs = require('fs');
 const { createAiRequest, aiFailure } = require('./lib/ai-request');
 const { randomUUID } = require('node:crypto');
 const { formatDescription, emphasizeOpening } = require('./public/js/description-format');
+const { tokenize: tokenizeWords } = require('./lib/text-tokens');
+const { wordKey } = require('./lib/word-families');
+const { repetitionBudget, CHARACTERS_PER_USE } = require('./lib/repetition-policy');
 
 // Simple .env loader (no dependency needed)
 const envPath = path.join(__dirname, '.env');
@@ -57,14 +60,13 @@ function sendAiFailure(res, error, context) {
   if (!res.destroyed && !res.headersSent) res.status(failure.status).json({ code: failure.code, error: failure.error });
 }
 
-// ===== Спам-аналіз тексту (точна логіка ASOMobile Text Analyzer) =====
-// Форми слова об'єднуються (tap + taps + tapping + tapped = "tap"),
-// переспам = щільність слова > SPAM_DENSITY % від загальної кількості слів
+// Strict listing guard: all word families, density AND visible character length.
+// Shares normalization/budget rules with Localize; not proprietary ASOMobile parity.
 const SPAM_DENSITY = Number(process.env.SPAM_DENSITY || 2.5);
 const STOP_WORDS = new Set(('a,an,the,and,or,but,if,then,else,when,while,for,to,of,in,on,at,by,with,from,up,down,' +
   'out,off,over,under,again,further,once,here,there,all,any,both,each,few,more,most,other,some,such,no,nor,not,' +
-  'only,own,same,so,than,too,very,can,will,just,should,now,is,are,was,were,be,been,being,have,has,had,do,does,' +
-  'did,doing,would,could,might,must,shall,may,it,its,this,that,these,those,you,your,yours,we,our,ours,they,' +
+  'only,own,same,so,than,too,very,can,will,just,should,now,am,is,are,was,were,be,been,being,have,has,had,having,do,does,' +
+  'did,done,doing,would,could,might,must,shall,may,it,its,this,that,these,those,you,your,yours,we,our,ours,they,' +
   'them,their,he,she,his,her,i,me,my,as,about,into,through,after,before,between,during,without,within,also,' +
   'get,let,us,via,per,vs,etc,s,t,re,ll,d,m').split(','));
 
@@ -105,33 +107,52 @@ function tokenize(text) {
 }
 
 function analyzeText(text) {
-  const tokens = tokenize(formatDescription(text).text);
-  const totalWords = tokens.length; // всі слова, включно зі стоп-словами (як в ASOMobile)
-  const freq = {};
-  const forms = {};
+  const visible = formatDescription(text).text;
+  const tokens = tokenizeWords(visible, 'en-US', { includeNumbers: true });
+  const totalWords = tokens.length;
+  const groups = new Map();
   for (const t of tokens) {
-    if (t.length < 2 || STOP_WORDS.has(t) || /^\d+$/.test(t)) continue;
-    const n = normalize(t);
-    freq[n] = (freq[n] || 0) + 1;
-    forms[n] = forms[n] || {};
-    forms[n][t] = (forms[n][t] || 0) + 1;
+    if (!/\p{L}/u.test(t)) continue;
+    const key = wordKey(t, 'en', STOP_WORDS);
+    const group = groups.get(key) || { count: 0, forms: new Map() };
+    group.count++;
+    group.forms.set(t, (group.forms.get(t) || 0) + 1);
+    groups.set(key, group);
   }
-  const frequency = Object.entries(freq)
-    .map(([stem, count]) => {
-      // показуємо найчастішу реальну форму слова, а не обрубок-стем
-      const display = Object.entries(forms[stem]).sort((a, b) => b[1] - a[1])[0][0];
+  const frequency = [...groups].map(([key, { count, forms }]) => {
+      const entries = [...forms];
+      const display = key.startsWith('family:') ? key.slice(7) : [...entries].sort((a, b) => b[1] - a[1])[0][0];
       return {
         word: display, count,
+        forms: entries.map(([word, count]) => ({ word, count })),
         density: totalWords ? +(count / totalWords * 100).toFixed(2) : 0
       };
     })
     .sort((a, b) => b.count - a.count);
-  const spam = frequency.filter(w => w.density > SPAM_DENSITY);
-  return { totalWords, frequency, spam, maxAllowed: Math.floor(totalWords * SPAM_DENSITY / 100) };
+  const budget = repetitionBudget(visible, 'en-US', totalWords, 'strict', SPAM_DENSITY);
+  // Compare exact counts, never rounded display percentages.
+  const spam = frequency.filter(w => w.count > budget.maxAllowed)
+    .map(w => ({ ...w, removeCount: w.count - budget.maxAllowed }));
+  return { totalWords, frequency, spam, maxAllowed: budget.maxAllowed, budget };
 }
 
 const wordFrequency = text => analyzeText(text).frequency;
 const findSpam = text => analyzeText(text).spam;
+const repetitionScore = analysis => analysis.spam.reduce((sum, item) => sum + item.removeCount, 0) * 1000 + analysis.spam.length;
+
+function repairRules(analysis) {
+  const target = analysis.budget.repairTarget;
+  const watch = analysis.frequency.filter(item => item.count >= target && !analysis.spam.some(problem => problem.word === item.word)).slice(0, 10);
+  return `Check EVERY word, including grammatical words such as and, the, to, your, for, of, a and pronouns. There are NO stop-word exceptions. Combine word forms: is/are/was/were/be/been/being count together as "be"; has/had/have as "have"; does/did/done/do as "do"; content-word inflections also count together.
+The current visible description has ${analysis.totalWords} words and ${analysis.budget.characters} normalized characters. HTML tags and attributes do not count as words or visible characters.
+The allowed count is the SMALLER of floor(wordCount * ${SPAM_DENSITY} / 100) and floor(visibleCharacterCount / ${CHARACTERS_PER_USE}), with a minimum of 1. The current allowance is ${analysis.maxAllowed}; aim for at most ${target} per flagged family to leave headroom. Recompute both budgets on the FINAL text: shortening can lower the allowance. Do not add filler or padding to dilute density.
+
+Over-used word families (reduce their TOTAL, not just one spelling):
+${analysis.spam.map(item => `- "${item.word}" — used ${item.count}; remove at least ${item.count - target}. Forms: ${item.forms.map(form => `${form.word} ×${form.count}`).join(', ')}`).join('\n')}
+${watch.length ? `\nNear-limit families (avoid introducing new repetition): ${watch.map(item => `"${item.word}" ×${item.count}`).join('; ')}.` : ''}
+
+Preserve natural, grammatical English: restructure clauses, split or combine sentences, use direct verbs and varied subjects. Do NOT simply strip articles/prepositions or replace "and" with another repeated conjunction, slash or symbol. Preserve every fact, quantity, negation, named feature and legal qualifier. Do not drop facts to satisfy counts.`;
+}
 
 // ===== Стилі опису =====
 const RICH_FORMAT_RULES = `ASO RICH HTML formatting: preserve a polished, readable full description using ONLY <b>, <i>, <u>, <font color="#D32F2F">, <font color="#0F766E"> and their closing tags. Use actual newlines between sections, not HTML layout tags. Never use CSS, style attributes, links, images, scripts or markdown.
@@ -222,7 +243,7 @@ SEO-БАЗА (незмінна): визнач 3–5 цільових ключо�
 ━━ КРОК 4. ПРАВИЛА ЩІЛЬНОСТІ (перевіряється автоматично) ━━
 - Головне ключове слово: 4–5 входжень на весь опис, рівномірно (хук → features → фінальний абзац), не підряд.
 - Кожен другорядний ключ: 2–3 входження.
-- ЖОДНЕ значуще слово не має перевищувати ліміт повторів, указаний у загальних вимогах вище. Рахуються разом усі форми: однина/множина, -ing/-ed, частини складених слів через дефіс.
+- ЖОДНЕ слово, включно зі службовими and, the, to, your, не має перевищувати ліміт повторів із загальних вимог. Рахуються разом усі форми: однина/множина, -ing/-ed, частини складених слів через дефіс, is/are/be та інші форми одного дієслова.
 - Перед відповіддю подумки перелічи входження найчастіших слів; якщо ліміт перевищено — заміни синонімами та перепиши.
 
 ━━ КРОК 5. ЗАБОРОНИ (інакше бан або пессимізація) ━━
@@ -368,21 +389,17 @@ app.post('/api/fix-spam', aiRequest, async (req, res) => {
     }
     if (!req.app.locals.isAIConfigured()) return sendAiFailure(res, { code: 'configuration' }, req.ai);
 
-    const scoreOf = a => a.spam.reduce((s, w) => s + (w.density - SPAM_DENSITY), 0) + a.spam.length * 0.01;
+    const scoreOf = repetitionScore;
     let best = { text, analysis };
     let attempts = 0;
     let warning;
 
     while (analysis.spam.length > 0 && attempts < req.ai.limit) {
       attempts++;
-      const safeMax = Math.max(1, analysis.maxAllowed - 1);
       const prompt = `Below is a Google Play full description for the app "${appName}".
-A keyword-spam check found over-used words. All forms of a word count together (singular + plural + -ing/-ed + inside hyphenated words). The text has ${analysis.totalWords} words.
+${repairRules(analysis)}
 
-Over-used words:
-${analysis.spam.map(s => `- "${s.word}" — used ${s.count} times (${s.density}%), must appear at most ${safeMax} times`).join('\n')}
-
-Rewrite so every listed word appears at most ${safeMax} times. Keep the meaning, features, structure, emojis, formatting and overall length unchanged. Do not add features. Before answering, count the occurrences in your rewrite and fix again if any is still above the limit.
+Rewrite only what is needed to fix these repetitions. Keep the meaning, features, structure, emojis, formatting and overall length. Do not add features. Verify the final whole description against the budgets above before answering.
 ${formatDescription(text).hasMarkup ? RICH_FORMAT_RULES : ''}
 
 Description:
@@ -419,6 +436,7 @@ function buildSpamCheck(a, fixAttempts) {
     densityLimit: SPAM_DENSITY,
     totalWords: a.totalWords,
     maxAllowed: a.maxAllowed,
+    budget: a.budget,
     fixAttempts,
     clean: a.spam.length === 0,
     remaining: a.spam,
@@ -433,6 +451,7 @@ app.post('/api/spam-check', (req, res) => {
     densityLimit: SPAM_DENSITY,
     totalWords: a.totalWords,
     maxAllowed: a.maxAllowed,
+    budget: a.budget,
     spam: a.spam,
     frequency: a.frequency.slice(0, 50)
   });
@@ -480,7 +499,7 @@ ${TONE_INSTRUCTIONS[tone] || TONE_INSTRUCTIONS.normal}
 - Емодзі дозволені ТІЛЬКИ у full_description. У short_description — ЗАБОРОНЕНІ (політика Google Play), там лише текст і розділові знаки.
 - Без неперевірених заяв типу "#1 app", "the best app", без згадок конкурентів, рейтингів чи цін.
 - Опис має пройти модерацію Google Play без ризику блокування.
-- АНТИ-ПЕРЕСПАМ (дуже важливо, перевіряється автоматично): жодне значуще слово не має вживатися більше ніж ${SIZE_MAX_REPEATS[size] || SIZE_MAX_REPEATS.small} разів на весь опис. Рахуються РАЗОМ усі форми слова: однина+множина (tile/tiles), дієслівні форми (tap/taps/tapping/tapped), а також входження у складені слова через дефіс (tile-matching = tile + matching). Перед відповіддю подумки перелічи входження найчастіших слів і, якщо якесь перевищує ліміт, перепиши через синоніми, займенники або інше формулювання. Це стосується і назви додатку, якщо вона складається зі звичайних слів.`;
+- АНТИ-ПЕРЕСПАМ (автоматична перевірка): враховуй УСІ слова, включно зі службовими and, the, to, your, for, of, a та займенниками. Винятків для стоп-слів немає. Плануй максимум ${SIZE_MAX_REPEATS[size] || SIZE_MAX_REPEATS.small} вживань на групу форм із запасом. На готовому описі ліміт — менше з floor(кількість слів * ${SPAM_DENSITY} / 100) і floor(видимі символи / ${CHARACTERS_PER_USE}), мінімум 1. HTML не збільшує цей ліміт. Рахуй разом однину/множину, дієслівні форми, слова через дефіс; is/are/was/were/be/been/being — одна група be, have/has/had — have, do/does/did/done — do. Якщо повторів забагато, природно перебудовуй речення, використовуй прямі дієслова й різні конструкції. Не видаляй механічно артиклі/прийменники, не підміняй and іншим однаковим сполучником або символом, не додавай порожній текст заради відсотків. Зберігай факти, числа, заперечення й граматику. Це також стосується звичайних слів у назві додатку.`;
 
     if (needSelection) {
       task += `
@@ -526,25 +545,16 @@ ${TONE_INSTRUCTIONS[tone] || TONE_INSTRUCTIONS.normal}
 
     // Запам'ятовуємо найкращий варіант (раптом чергова спроба зробить гірше)
     let best = { text: fullDescription, analysis };
-    const score = a => a.spam.reduce((s, w) => s + (w.density - SPAM_DENSITY), 0) + a.spam.length * 0.01;
+    const score = repetitionScore;
 
     while (analysis.spam.length > 0 && fixAttempts < MAX_FIX) {
       fixAttempts++;
       try {
-        const safeMax = Math.max(1, analysis.maxAllowed - 1); // запас міцності на різницю в підрахунку
-        // Слова на межі — теж просимо трохи розвантажити, щоб не з'явився переспам після правок
-        const borderline = analysis.frequency.filter(w =>
-          !analysis.spam.some(s => s.word === w.word) && w.count >= safeMax
-        ).slice(0, 6);
         const fixPrompt = `Below is a full description for Google Play for the app "${appName}".
-A keyword-spam check (ASOMobile Text Analyzer) found over-used words. Rule: a word's density must not exceed ${SPAM_DENSITY}% of the total word count. The text has ${analysis.totalWords} words. All forms of a word count together: singular + plural + -ing/-ed forms + inside hyphenated words (tap + taps + tapping + tapped + tap-to-win all count as "tap").
-
-Over-used words (MUST be reduced):
-${analysis.spam.map(s => `- "${s.word}" — used ${s.count} times (${s.density}%), must appear at most ${safeMax} times (remove at least ${s.count - safeMax})`).join('\n')}
-${borderline.length ? `\nBorderline words (close to the limit — reduce by 1 if possible):\n${borderline.map(w => `- "${w.word}" — used ${w.count} times`).join('\n')}\n` : ''}
+${repairRules(analysis)}
 Rewrite the description so that:
-1. Each of these words (counting ALL its forms) appears no more than ${safeMax} times — replace extra occurrences with synonyms or rephrase. Do not simply delete sentences; keep overall length similar.
-1a. BEFORE answering, mentally count every occurrence of each listed word in your rewritten text (including plural, -ing/-ed forms and occurrences inside hyphenated words). If any is still above ${safeMax}, rewrite again before responding.
+1. Every listed family fits the final budgets above. Do not simply delete sentences; keep overall length similar.
+1a. Before answering, verify the whole revised text, including grammatical words and newly introduced repetitions.
 1b. Prefer replacing a repeated noun with a pronoun ("it", "they") or a synonym, merging two sentences, or rephrasing the idea — rather than deleting content.
 2. The meaning, features and overall length stay the same.
 3. Do NOT add features that are not mentioned.
@@ -598,15 +608,7 @@ Respond STRICTLY as JSON without markdown:
       selected,
       usage: { calls: req.ai.calls, limit: req.ai.limit },
       ...(warning ? { warning } : {}),
-      spamCheck: {
-        densityLimit: SPAM_DENSITY,
-        totalWords: analysis.totalWords,
-        maxAllowed: analysis.maxAllowed,
-        fixAttempts,
-        clean: analysis.spam.length === 0,
-        remaining: analysis.spam,
-        frequency: analysis.frequency.slice(0, 50)
-      }
+      spamCheck: buildSpamCheck(analysis, fixAttempts)
     });
   } catch (err) {
     sendAiFailure(res, err, req.ai);

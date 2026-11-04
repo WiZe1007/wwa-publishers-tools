@@ -1,12 +1,15 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const express = require('express');
-const { app } = require('../server');
+const { app, TONE_INSTRUCTIONS } = require('../server');
 const { createAiRequest } = require('../lib/ai-request');
 const cleanText = Array.from({ length: 80 }, (_, i) => `detail${i}`).join(' ');
 const spamText = 'orchard '.repeat(8) + cleanText;
 const draft = { short_description: 'Demo: Explore.', full_description: cleanText };
 const body = { appName: 'Demo', description: 'An offline garden guide.', tone: 'aso_pro', size: 'small', screenshots: [] };
+const vip = require('./fixtures/english-vip-listing');
+const editedVip = vip.replace('Is this a real money game?', 'Does this game involve real money?')
+  .replace('All coins are virtual', 'All coins stay virtual');
 
 async function fixture(t, callClaude) {
   const original = { callClaude: app.locals.callClaude, isAIConfigured: app.locals.isAIConfigured };
@@ -27,6 +30,42 @@ test('ASO successful generation returns both fields and makes one provider call'
   const { status, data } = await post();
   assert.equal(status, 200); assert.equal(calls, 1); assert.equal(data.usage.limit, 2);
   assert.equal(data.fullDescription, cleanText); assert.equal(data.shortDescription, draft.short_description);
+});
+
+for (const tone of Object.keys(TONE_INSTRUCTIONS)) test(`${tone}: generation and repair include grammatical words within the same two-call budget`, async t => {
+  let calls = 0;
+  const post = await fixture(t, async content => {
+    const prompt = content.filter(item => item.type === 'text').map(item => item.text).join('\n');
+    if (++calls === 1) {
+      assert.match(prompt, /and, the, to, your/);
+      return JSON.stringify({ short_description: 'VIP Games: Explore.', full_description: vip });
+    }
+    assert.match(prompt, /character/i);
+    assert.match(prompt, /is ×4/);
+    assert.match(prompt, /are ×2/);
+    return JSON.stringify({ full_description: editedVip });
+  });
+  const { status, data } = await post('/api/aso', { ...body, appName: 'VIP Games', tone });
+  assert.equal(status, 200);
+  assert.equal(calls, 2);
+  assert.equal(data.usage.calls, 2);
+  assert.equal(data.spamCheck.clean, true);
+  assert.equal(data.spamCheck.maxAllowed, 6);
+});
+
+test('a lower displayed density cannot make a worse character-limited repair win', async t => {
+  const makeText = (andCount, words, chars) => {
+    const text = [...Array(andCount).fill('and'), ...Array.from({ length: words - andCount }, (_, i) => `w${i}`)].join(' ');
+    assert.ok(text.length <= chars);
+    return text + 'x'.repeat(chars - text.length);
+  };
+  const original = makeText(7, 280, 1600); // allowed 6, excess 1, displayed 2.5%
+  const worse = makeText(11, 500, 2450); // allowed 9, excess 2, displayed 2.2%
+  const post = await fixture(t, async () => JSON.stringify({ full_description: worse }));
+  const { status, data } = await post('/api/fix-spam', { text: original });
+  assert.equal(status, 200);
+  assert.equal(data.fullDescription, original);
+  assert.equal(data.spamCheck.remaining.find(item => item.word === 'and').removeCount, 1);
 });
 
 test('rich HTML style reaches generation and repair while markup never dilutes repetition counts', async t => {

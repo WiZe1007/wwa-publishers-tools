@@ -6,7 +6,7 @@ const { analyzeText } = require('../server');
 test('ASO repetition analysis counts visible words, excluding formatting and color attributes', () => {
   const result = analyzeText('<b><font color="red">Play</font></b> <i>the</i> <u>puzzle</u><br>R&amp;D');
   assert.equal(result.totalWords, 5);
-  assert.deepEqual(result.frequency.map(row => [row.word, row.count]), [['play', 1], ['puzzle', 1]]);
+  assert.deepEqual(result.frequency.map(row => [row.word, row.count]), [['play', 1], ['the', 1], ['puzzle', 1], ['r', 1], ['d', 1]]);
 });
 
 test('formatting preserves nested emphasis and decodes entities for plain-text copying', () => {
