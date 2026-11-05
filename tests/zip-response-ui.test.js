@@ -75,12 +75,15 @@ test('ZIP rich result previews safe formatting and copies both original HTML and
 test('ZIP keeps a valid partial result and displays the server warning', async () => {
   const $ = await mount(async () => new Response(JSON.stringify({ shortDescription: 'Demo: Choose tasks.', fullDescription: 'Choose tasks. Track progress.',
     warning: 'AI не встиг відповісти. Отриманий опис збережено.',
-    spamCheck: { clean: false, remaining: [{ word: 'task', count: 3, density: 5 }], frequency: [], fixAttempts: 1, maxAllowed: 2, totalWords: 60, densityLimit: 2.5 }
+    spamCheck: { clean: false, remaining: [{ word: 'spin', count: 7, density: 2.29 }],
+      frequency: [{ word: 'spin', count: 7, density: 2.29 }], fixAttempts: 1, maxAllowed: 6, totalWords: 306, densityLimit: 2.5 }
   })));
   await $('genBtn').onclick();
   assert.equal($('fullDesc').value, 'Choose tasks. Track progress.');
   assert.match($('genStatus').textContent, /Отриманий опис збережено/);
-  assert.match($('spamStatus').textContent, /Переспам/);
+  assert.doesNotMatch($('genStatus').textContent, /Готово/);
+  assert.match($('spamStatus').textContent, /«spin» ×7.*прибрати 1/);
+  assert.equal($('spamTable').children[0].style.borderColor, 'var(--red)');
   assert.equal($('genBtn').disabled, false);
 });
 test('ZIP manual repair preserves the current description after an empty gateway error', async () => {

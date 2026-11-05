@@ -8,6 +8,7 @@ const fs = require('fs');
 const { createAiRequest, aiFailure } = require('./lib/ai-request');
 const { randomUUID } = require('node:crypto');
 const { formatDescription, emphasizeOpening } = require('./public/js/description-format');
+const { repetitionBudget, STRICT_DENSITY, CHARACTERS_PER_USE } = require('./lib/repetition-policy');
 
 // Simple .env loader (no dependency needed)
 const envPath = path.join(__dirname, '.env');
@@ -57,10 +58,8 @@ function sendAiFailure(res, error, context) {
   if (!res.destroyed && !res.headersSent) res.status(failure.status).json({ code: failure.code, error: failure.error });
 }
 
-// ===== Спам-аналіз тексту (точна логіка ASOMobile Text Analyzer) =====
-// Форми слова об'єднуються (tap + taps + tapping + tapped = "tap"),
-// переспам = щільність слова > SPAM_DENSITY % від загальної кількості слів
-const SPAM_DENSITY = Number(process.env.SPAM_DENSITY || 2.5);
+// Ліміт повторів ключових слів враховує щільність і довжину видимого опису.
+const SPAM_DENSITY = Number(process.env.SPAM_DENSITY || STRICT_DENSITY);
 const STOP_WORDS = new Set(('a,an,the,and,or,but,if,then,else,when,while,for,to,of,in,on,at,by,with,from,up,down,' +
   'out,off,over,under,again,further,once,here,there,all,any,both,each,few,more,most,other,some,such,no,nor,not,' +
   'only,own,same,so,than,too,very,can,will,just,should,now,is,are,was,were,be,been,being,have,has,had,do,does,' +
@@ -105,7 +104,8 @@ function tokenize(text) {
 }
 
 function analyzeText(text) {
-  const tokens = tokenize(formatDescription(text).text);
+  const visible = formatDescription(text).text;
+  const tokens = tokenize(visible);
   const totalWords = tokens.length; // всі слова, включно зі стоп-словами (як в ASOMobile)
   const freq = {};
   const forms = {};
@@ -126,12 +126,17 @@ function analyzeText(text) {
       };
     })
     .sort((a, b) => b.count - a.count);
-  const spam = frequency.filter(w => w.density > SPAM_DENSITY);
-  return { totalWords, frequency, spam, maxAllowed: Math.floor(totalWords * SPAM_DENSITY / 100) };
+  const { maxAllowed } = repetitionBudget(visible, 'en', totalWords, 'strict', SPAM_DENSITY);
+  const spam = frequency.filter(w => w.count > maxAllowed);
+  return { totalWords, frequency, spam, maxAllowed };
 }
 
 const wordFrequency = text => analyzeText(text).frequency;
 const findSpam = text => analyzeText(text).spam;
+
+function repetitionScore(analysis) {
+  return analysis.spam.reduce((sum, word) => sum + (word.count - analysis.maxAllowed), 0);
+}
 
 // ===== Стилі опису =====
 const RICH_FORMAT_RULES = `ASO RICH HTML formatting: preserve a polished, readable full description using ONLY <b>, <i>, <u>, <font color="#D32F2F">, <font color="#0F766E"> and their closing tags. Use actual newlines between sections, not HTML layout tags. Never use CSS, style attributes, links, images, scripts or markdown.
@@ -368,21 +373,20 @@ app.post('/api/fix-spam', aiRequest, async (req, res) => {
     }
     if (!req.app.locals.isAIConfigured()) return sendAiFailure(res, { code: 'configuration' }, req.ai);
 
-    const scoreOf = a => a.spam.reduce((s, w) => s + (w.density - SPAM_DENSITY), 0) + a.spam.length * 0.01;
     let best = { text, analysis };
     let attempts = 0;
     let warning;
 
     while (analysis.spam.length > 0 && attempts < req.ai.limit) {
       attempts++;
-      const safeMax = Math.max(1, analysis.maxAllowed - 1);
+      const target = analysis.maxAllowed;
       const prompt = `Below is a Google Play full description for the app "${appName}".
 A keyword-spam check found over-used words. All forms of a word count together (singular + plural + -ing/-ed + inside hyphenated words). The text has ${analysis.totalWords} words.
 
 Over-used words:
-${analysis.spam.map(s => `- "${s.word}" — used ${s.count} times (${s.density}%), must appear at most ${safeMax} times`).join('\n')}
+${analysis.spam.map(s => `- "${s.word}" — used ${s.count} times (${s.density}%), must appear at most ${target} times`).join('\n')}
 
-Rewrite so every listed word appears at most ${safeMax} times. Keep the meaning, features, structure, emojis, formatting and overall length unchanged. Do not add features. Before answering, count the occurrences in your rewrite and fix again if any is still above the limit.
+Rewrite so every listed word appears at most ${target} times. Keep the meaning, features, structure, emojis, formatting and overall length unchanged. Do not add features. Before answering, check the final counts. Shortening the visible description can lower the repetition limit.
 ${formatDescription(text).hasMarkup ? RICH_FORMAT_RULES : ''}
 
 Description:
@@ -403,10 +407,10 @@ Respond STRICTLY as JSON without markdown:
       text = fixed.full_description.trim();
       if (preserveRedOpening) text = emphasizeOpening(text);
       analysis = analyzeText(text);
-      if (scoreOf(analysis) < scoreOf(best.analysis)) best = { text, analysis };
+      if (repetitionScore(analysis) < repetitionScore(best.analysis)) best = { text, analysis };
     }
 
-    if (scoreOf(analysis) > scoreOf(best.analysis)) { text = best.text; analysis = best.analysis; }
+    if (repetitionScore(analysis) > repetitionScore(best.analysis)) { text = best.text; analysis = best.analysis; }
     if (!res.destroyed) res.json({ fullDescription: text, fixAttempts: attempts, spamCheck: buildSpamCheck(analysis, attempts),
       usage: { calls: req.ai.calls, limit: req.ai.limit }, ...(warning ? { warning } : {}) });
   } catch (err) {
@@ -480,7 +484,7 @@ ${TONE_INSTRUCTIONS[tone] || TONE_INSTRUCTIONS.normal}
 - Емодзі дозволені ТІЛЬКИ у full_description. У short_description — ЗАБОРОНЕНІ (політика Google Play), там лише текст і розділові знаки.
 - Без неперевірених заяв типу "#1 app", "the best app", без згадок конкурентів, рейтингів чи цін.
 - Опис має пройти модерацію Google Play без ризику блокування.
-- АНТИ-ПЕРЕСПАМ (дуже важливо, перевіряється автоматично): жодне значуще слово не має вживатися більше ніж ${SIZE_MAX_REPEATS[size] || SIZE_MAX_REPEATS.small} разів на весь опис. Рахуються РАЗОМ усі форми слова: однина+множина (tile/tiles), дієслівні форми (tap/taps/tapping/tapped), а також входження у складені слова через дефіс (tile-matching = tile + matching). Перед відповіддю подумки перелічи входження найчастіших слів і, якщо якесь перевищує ліміт, перепиши через синоніми, займенники або інше формулювання. Це стосується і назви додатку, якщо вона складається зі звичайних слів.`;
+- АНТИ-ПЕРЕСПАМ (перевіряється автоматично): плануй до ${SIZE_MAX_REPEATS[size] || SIZE_MAX_REPEATS.small} вживань кожного значущого слова. Для готового тексту ліміт — менше з ${SPAM_DENSITY}% від кількості слів і одного вживання на ${CHARACTERS_PER_USE} видимих символів, з округленням вниз і мінімумом 1. Рахуються разом форми слова (tile/tiles, tap/taps/tapping/tapped) та частини слів через дефіс (tile-matching = tile + matching). Перед відповіддю перевір найчастіші слова і перефразуй зайві вживання. Це стосується і звичайних слів у назві додатку.`;
 
     if (needSelection) {
       task += `
@@ -526,25 +530,22 @@ ${TONE_INSTRUCTIONS[tone] || TONE_INSTRUCTIONS.normal}
 
     // Запам'ятовуємо найкращий варіант (раптом чергова спроба зробить гірше)
     let best = { text: fullDescription, analysis };
-    const score = a => a.spam.reduce((s, w) => s + (w.density - SPAM_DENSITY), 0) + a.spam.length * 0.01;
-
     while (analysis.spam.length > 0 && fixAttempts < MAX_FIX) {
       fixAttempts++;
       try {
-        const safeMax = Math.max(1, analysis.maxAllowed - 1); // запас міцності на різницю в підрахунку
-        // Слова на межі — теж просимо трохи розвантажити, щоб не з'явився переспам після правок
+        const target = analysis.maxAllowed;
         const borderline = analysis.frequency.filter(w =>
-          !analysis.spam.some(s => s.word === w.word) && w.count >= safeMax
+          w.count === target
         ).slice(0, 6);
         const fixPrompt = `Below is a full description for Google Play for the app "${appName}".
-A keyword-spam check (ASOMobile Text Analyzer) found over-used words. Rule: a word's density must not exceed ${SPAM_DENSITY}% of the total word count. The text has ${analysis.totalWords} words. All forms of a word count together: singular + plural + -ing/-ed forms + inside hyphenated words (tap + taps + tapping + tapped + tap-to-win all count as "tap").
+A keyword-spam check found over-used words. The current limit is ${target} uses per keyword. It depends on both word count (${SPAM_DENSITY}% maximum density) and visible length (one use per ${CHARACTERS_PER_USE} characters). Shortening the text can lower the limit. All forms of a word count together: singular + plural + -ing/-ed forms + inside hyphenated words (tap + taps + tapping + tapped + tap-to-win all count as "tap").
 
 Over-used words (MUST be reduced):
-${analysis.spam.map(s => `- "${s.word}" — used ${s.count} times (${s.density}%), must appear at most ${safeMax} times (remove at least ${s.count - safeMax})`).join('\n')}
-${borderline.length ? `\nBorderline words (close to the limit — reduce by 1 if possible):\n${borderline.map(w => `- "${w.word}" — used ${w.count} times`).join('\n')}\n` : ''}
+${analysis.spam.map(s => `- "${s.word}" — used ${s.count} times (${s.density}%), must appear at most ${target} times (remove at least ${s.count - target})`).join('\n')}
+${borderline.length ? `\nWords at the limit (avoid adding more uses):\n${borderline.map(w => `- "${w.word}" — used ${w.count} times`).join('\n')}\n` : ''}
 Rewrite the description so that:
-1. Each of these words (counting ALL its forms) appears no more than ${safeMax} times — replace extra occurrences with synonyms or rephrase. Do not simply delete sentences; keep overall length similar.
-1a. BEFORE answering, mentally count every occurrence of each listed word in your rewritten text (including plural, -ing/-ed forms and occurrences inside hyphenated words). If any is still above ${safeMax}, rewrite again before responding.
+1. Each of these words (counting ALL its forms) appears no more than ${target} times — replace extra occurrences with synonyms or rephrase. Do not simply delete sentences; keep overall length similar.
+1a. Before answering, check each listed word's final count, including plural, -ing/-ed and hyphenated forms.
 1b. Prefer replacing a repeated noun with a pronoun ("it", "they") or a synonym, merging two sentences, or rephrasing the idea — rather than deleting content.
 2. The meaning, features and overall length stay the same.
 3. Do NOT add features that are not mentioned.
@@ -563,7 +564,7 @@ Respond STRICTLY as JSON without markdown:
         fullDescription = fixed.full_description.trim();
         if (tone === 'aso_rich_html') fullDescription = emphasizeOpening(fullDescription);
         analysis = analyzeText(fullDescription);
-        if (score(analysis) < score(best.analysis)) best = { text: fullDescription, analysis };
+        if (repetitionScore(analysis) < repetitionScore(best.analysis)) best = { text: fullDescription, analysis };
       } catch (e) {
         const failure = aiFailure(e); req.ai.code = failure.code;
         warning = failure.error + ' Отриманий опис збережено; перевірте зауваження нижче.';
@@ -572,7 +573,7 @@ Respond STRICTLY as JSON without markdown:
     }
 
     // Якщо остання спроба гірша за найкращу — повертаємо найкращу
-    if (score(analysis) > score(best.analysis)) {
+    if (repetitionScore(analysis) > repetitionScore(best.analysis)) {
       fullDescription = best.text;
       analysis = best.analysis;
     }

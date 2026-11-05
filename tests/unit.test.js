@@ -67,7 +67,7 @@ describe('Поріг переспаму', () => {
 
   test('слово зі щільністю 2.28% переспамом НЕ вважається', () => {
     // 5 повторів на 219 слів = 2.28%
-    const filler = Array.from({ length: 214 }, (_, i) => 'w' + i).join(' ');
+    const filler = Array.from({ length: 214 }, (_, i) => 'detail' + i).join(' ');
     const a = analyzeText('game game game game game ' + filler);
     assert.strictEqual(a.totalWords, 219);
     assert.ok(!a.spam.some(w => w.word === 'game'), 'game не має бути в переспамі');
@@ -78,9 +78,9 @@ describe('Поріг переспаму', () => {
     assert.strictEqual(analyzeText(words).spam.length, 0);
   });
 
-  test('maxAllowed рахується від кількості слів', () => {
+  test('короткий видимий текст може знизити ліміт, розрахований за кількістю слів', () => {
     const a = analyzeText(Array.from({ length: 200 }, (_, i) => 'w' + i).join(' '));
-    assert.strictEqual(a.maxAllowed, Math.floor(200 * 2.5 / 100));
+    assert.strictEqual(a.maxAllowed, 3);
   });
 
   test('порожній текст не ламає аналіз', () => {

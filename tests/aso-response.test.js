@@ -29,6 +29,35 @@ test('ASO successful generation returns both fields and makes one provider call'
   assert.equal(data.fullDescription, cleanText); assert.equal(data.shortDescription, draft.short_description);
 });
 
+test('a 1637-character description flags seven spins at 2.29% and accepts six after repair', async t => {
+  const words = ['spin', 'spin', 'spin', 'spin', 'spins', 'spins', 'spinning',
+    ...Array(6).fill('reels'), ...Array(12).fill('and')];
+  const filler = Array.from({ length: 306 - words.length }, (_, index) => `w${index.toString(36).padStart(3, '0')}`);
+  const extraChars = 1637 - [...words, ...filler].join(' ').length;
+  const visible = [...words, ...filler.map((word, index) => index < extraChars ? `${word}x` : word)].join(' ');
+  assert.equal(visible.length, 1637);
+  const text = visible.replace('spin', '<b>spin</b>');
+  const repaired = text.replace('<b>spin</b>', '<b>turn</b>');
+  let calls = 0;
+  const post = await fixture(t, async content => {
+    if (++calls === 1) return JSON.stringify({ ...draft, full_description: text });
+    assert.match(content[0].text, /"spin".*must appear at most 6 times/);
+    return JSON.stringify({ full_description: repaired });
+  });
+
+  const checked = await post('/api/spam-check', { text });
+  assert.equal(checked.data.totalWords, 306);
+  assert.equal(checked.data.maxAllowed, 6);
+  assert.deepEqual(checked.data.spam, [{ word: 'spin', count: 7, density: 2.29 }]);
+  assert.equal(calls, 0);
+
+  const generated = await post();
+  assert.equal(generated.status, 200);
+  assert.equal(generated.data.fullDescription, repaired);
+  assert.equal(generated.data.spamCheck.clean, true);
+  assert.equal(calls, 2);
+});
+
 test('rich HTML style reaches generation and repair while markup never dilutes repetition counts', async t => {
   let calls = 0;
   const richDraft = '<b><font color="#D32F2F">Explore gardens.</font></b>\n\n' + cleanText;

@@ -233,9 +233,11 @@ $('genBtn').onclick = async () => {
     updCount();
     updFullCount();
     if (data.selected) { state.selectedIdx = data.selected; renderShots(); }
-    st.className = 'status ok';
-    st.textContent = '✓ Готово! Перевірте описи — за потреби відредагуйте їх перед створенням ZIP.';
-    if (data.warning) { st.className = 'status'; st.textContent = 'Опис отримано. ' + data.warning; }
+    const hasSpam = data.spamCheck?.clean === false;
+    st.className = hasSpam ? 'status err' : data.warning ? 'status' : 'status ok';
+    st.textContent = hasSpam ? 'Опис отримано. Зменште повтори, позначені нижче.'
+      : '✓ Готово! Перевірте описи перед створенням ZIP.';
+    if (data.warning) st.textContent += ' ' + data.warning;
     if (data.spamCheck) showSpam(data.spamCheck, true);
   } catch (e) {
     st.className = 'status err';
@@ -247,20 +249,20 @@ $('genBtn').onclick = async () => {
 function showSpam(sc, afterGen) {
   const st = $('spamStatus');
   const box = $('spamTable');
-  const limInfo = `щільність ≤ ${sc.densityLimit}%, тобто макс ${sc.maxAllowed} повторів при ${sc.totalWords} словах`;
+  const limInfo = `ліміт для цього опису — ${sc.maxAllowed} вживань на ключове слово`;
   if (sc.clean) {
     st.className = 'status ok';
     st.textContent = `✓ Переспаму немає (${limInfo})` +
       (afterGen && sc.fixAttempts ? `. AI виправляв опис ${sc.fixAttempts} раз(и)` : '');
   } else {
     st.className = 'status err';
-    st.textContent = `⚠ Переспам: ${sc.remaining.map(w => `«${w.word}» ×${w.count} (${w.density}%)`).join(', ')} — ${limInfo}` +
+    st.textContent = `⚠ Переспам: ${sc.remaining.map(w => `«${w.word}» ×${w.count} (${w.density}%, прибрати ${w.count - sc.maxAllowed})`).join(', ')} — ${limInfo}` +
       (afterGen ? `. AI зробив ${sc.fixAttempts} спроб(и) виправлення. Натисніть «Виправити переспам» або відредагуйте текст — генерувати заново не потрібно.` : '');
   }
   $('fixSpamBtn').style.display = sc.clean ? 'none' : '';
   box.innerHTML = '';
   (sc.frequency || []).slice(0, 24).forEach(w => {
-    const over = w.density > sc.densityLimit, warn = !over && w.count >= sc.maxAllowed;
+    const over = w.count > sc.maxAllowed, warn = w.count === sc.maxAllowed;
     const chip = document.createElement('span');
     chip.className = 'chip';
     chip.title = `щільність ${w.density}%`;
