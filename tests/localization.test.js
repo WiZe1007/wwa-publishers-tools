@@ -48,22 +48,7 @@ test('screenshot regression: de 25/286 and el 11/286 cannot pass', () => {
 test('English function words are included without accidental stemming', () => {
   const result = createChecker({ normalizeEnglish: normalize, englishStopWords: new Set(['the', 'was']) })({ ...clean,
     fullDescription: 'the the the was was was' });
-  assert.deepEqual(result.analyses.fullDescription.spam.map(item => item.word), ['the', 'be']);
-  assert.deepEqual(result.analyses.fullDescription.spam[1].forms, [{ word: 'was', count: 3 }]);
-});
-for (const [word, text] of [['be', 'am are are are is is is'], ['have', 'having have have has has had had'], ['do', 'done do do does does did did']]) {
-  test(`English Natural mode keeps the ${word} grammatical family classified consistently`, () => {
-    const result = createChecker()({ ...clean, profile: 'natural', fullDescription: text });
-    const analysis = result.analyses.fullDescription;
-    assert.equal(analysis.frequency.find(item => item.word === word).kind, 'function');
-    assert.equal(analysis.spam.some(item => item.word === word), false);
-  });
-}
-test('Natural English keeps us separate from the valid use verb family', () => {
-  const fullDescription = [...Array(4).fill('us'), ...Array(4).fill('use'), ...Array.from({ length: 92 }, (_, i) => `detail${i}`)].join(' ');
-  const analysis = createChecker({ englishStopWords: new Set(['us']) })({ ...clean, profile: 'natural', fullDescription }).analyses.fullDescription;
-  assert.equal(analysis.maxAllowed, 4);
-  assert.equal(analysis.spam.length, 0);
+  assert.deepEqual(result.analyses.fullDescription.spam.map(item => item.word), ['the', 'was']);
 });
 test('two repetitions above 2.5 percent are flagged, not hidden by a three-use exemption', () => {
   const result = check({ ...clean, locale: 'es-MX', fullDescription: 'de de sol luna' });

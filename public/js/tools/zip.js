@@ -233,11 +233,9 @@ $('genBtn').onclick = async () => {
     updCount();
     updFullCount();
     if (data.selected) { state.selectedIdx = data.selected; renderShots(); }
-    const needsEdits = data.spamCheck && !data.spamCheck.clean;
-    st.className = needsEdits ? 'status err' : 'status ok';
-    st.textContent = needsEdits ? 'Опис потребує правок: залишилися зайві повтори. Підказки — нижче.'
-      : '✓ Готово! Перевірте описи — за потреби відредагуйте їх перед створенням ZIP.';
-    if (data.warning) { if (!needsEdits) st.className = 'status'; st.textContent += ' ' + data.warning; }
+    st.className = 'status ok';
+    st.textContent = '✓ Готово! Перевірте описи — за потреби відредагуйте їх перед створенням ZIP.';
+    if (data.warning) { st.className = 'status'; st.textContent = 'Опис отримано. ' + data.warning; }
     if (data.spamCheck) showSpam(data.spamCheck, true);
   } catch (e) {
     st.className = 'status err';
@@ -249,23 +247,23 @@ $('genBtn').onclick = async () => {
 function showSpam(sc, afterGen) {
   const st = $('spamStatus');
   const box = $('spamTable');
-  const limInfo = `до ${sc.maxAllowed} вживань на слово або групу форм; перевірено ${sc.totalWords} слів`;
+  const limInfo = `щільність ≤ ${sc.densityLimit}%, тобто макс ${sc.maxAllowed} повторів при ${sc.totalWords} словах`;
   if (sc.clean) {
     st.className = 'status ok';
     st.textContent = `✓ Переспаму немає (${limInfo})` +
       (afterGen && sc.fixAttempts ? `. AI виправляв опис ${sc.fixAttempts} раз(и)` : '');
   } else {
     st.className = 'status err';
-    st.textContent = `⚠ Переспам: ${sc.remaining.map(w => `«${w.word}» ×${w.count} (прибрати ${w.removeCount ?? Math.max(1, w.count - sc.maxAllowed)})`).join(', ')} — ${limInfo}` +
+    st.textContent = `⚠ Переспам: ${sc.remaining.map(w => `«${w.word}» ×${w.count} (${w.density}%)`).join(', ')} — ${limInfo}` +
       (afterGen ? `. AI зробив ${sc.fixAttempts} спроб(и) виправлення. Натисніть «Виправити переспам» або відредагуйте текст — генерувати заново не потрібно.` : '');
   }
   $('fixSpamBtn').style.display = sc.clean ? 'none' : '';
   box.innerHTML = '';
   (sc.frequency || []).slice(0, 24).forEach(w => {
-    const over = w.count > sc.maxAllowed, warn = !over && w.count >= sc.maxAllowed;
+    const over = w.density > sc.densityLimit, warn = !over && w.count >= sc.maxAllowed;
     const chip = document.createElement('span');
     chip.className = 'chip';
-    chip.title = `щільність ${w.density}%` + (w.forms?.length > 1 ? `; форми: ${w.forms.map(form => `${form.word} ×${form.count}`).join(', ')}` : '');
+    chip.title = `щільність ${w.density}%`;
     chip.style.borderColor = over ? 'var(--red)' : warn ? 'var(--orange)' : 'var(--line)';
     chip.innerHTML = `${w.word} <b style="color:${over ? 'var(--red)' : warn ? 'var(--orange)' : 'var(--green)'}">${w.count}</b>`;
     box.appendChild(chip);

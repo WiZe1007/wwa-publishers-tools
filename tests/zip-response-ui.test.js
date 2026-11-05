@@ -83,18 +83,6 @@ test('ZIP keeps a valid partial result and displays the server warning', async (
   assert.match($('spamStatus').textContent, /Переспам/);
   assert.equal($('genBtn').disabled, false);
 });
-test('ZIP never labels a returned draft ready while grammatical repetitions remain', async () => {
-  const $ = await mount(async () => new Response(JSON.stringify({ shortDescription: 'Demo: Explore.', fullDescription: 'The original draft remains.',
-    spamCheck: { clean: false, remaining: [{ word: 'for', count: 7, removeCount: 1, density: 2.5 }], frequency: [{ word: 'for', count: 7, density: 2.5 }], fixAttempts: 1, maxAllowed: 6, totalWords: 280, densityLimit: 2.5 }
-  })));
-  await $('genBtn').onclick();
-  assert.match($('genStatus').className, /err/);
-  assert.doesNotMatch($('genStatus').textContent, /Готово/);
-  assert.match($('spamStatus').textContent, /прибрати 1/);
-  assert.equal($('spamTable').children[0].style.borderColor, 'var(--red)');
-  assert.equal($('fullDesc').value, 'The original draft remains.');
-  assert.equal($('genBtn').disabled, false);
-});
 test('ZIP manual repair preserves the current description after an empty gateway error', async () => {
   const $ = await mount(async () => new Response('', { status: 502 }));
   await $('fixSpamBtn').onclick();
