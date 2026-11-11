@@ -10,7 +10,21 @@ export function mount(root) {
     const name = safeName(file.name), dot = name.lastIndexOf('.');
     return dot > 0 ? name.slice(0, dot) + '_clean' + name.slice(dot) : name + '_clean';
   }
+  function sourceZipDate(file) {
+    // JSZip writes UTC fields, but native extractors treat DOS fields as local time.
+    const date = new Date(file.lastModified);
+    const localTime = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(),
+      date.getHours(), date.getMinutes(), date.getSeconds());
+    // DOS timestamps in ZIP support years 1980–2107, at two-second precision.
+    return new Date(Math.min(Date.UTC(2107, 11, 31, 23, 59, 58),
+      Math.max(Date.UTC(1980, 0, 1), localTime)));
+  }
   function render() {
+    const uniqueDates = $('cleanMode').value === 'unique';
+    $('cleanMode').disabled = busy;
+    $('modeHint').textContent = uniqueDates
+      ? 'Випадкова дата й час із минулих років — нові для кожного ZIP. Завантаження лише у ZIP, навіть для одного файлу.'
+      : 'Дати зміни початкових файлів зберігаються у ZIP. Завантажуйте ZIP, щоб зберегти ці дати.';
     $('fileQueue').replaceChildren();
     $('fileCount').textContent = `Файлів: ${entries.length}`;
     $('emptyQueue').hidden = entries.length > 0;
@@ -22,7 +36,7 @@ export function mount(root) {
       detail.textContent = `${formatSize(entry.file.size)} · ${entry.message || (entry.kind === 'video' ? 'Відео · без перекодування' : 'Зображення')}`;
       if (entry.error) detail.className = 'status err';
       info.append(name, detail); row.append(info);
-      if (entry.url) {
+      if (entry.url && !uniqueDates) {
         const link = document.createElement('a'); link.className = 'btn secondary small';
         link.href = entry.url; link.download = outputName(entry.result); link.textContent = 'Скачати';
         link.setAttribute('aria-label', `Скачати ${entry.file.name}`); row.append(link);
@@ -55,6 +69,7 @@ export function mount(root) {
     announce(skipped ? `Пропущено файлів: ${skipped}. Перевірте формати й обмеження розміру нижче.` : 'Файли додано. Натисніть «Очистити метадані».', skipped > 0);
   }
   $('drop').onclick = () => { if (!busy) $('input').click(); };
+  $('cleanMode').onchange = () => { if (!busy) render(); };
   $('input').onchange = () => { addFiles([...$('input').files]); $('input').value = ''; };
   for (const name of ['dragover', 'dragleave', 'drop']) $('drop').addEventListener(name, event => {
     event.preventDefault(); $('drop').classList.toggle('dragover', name === 'dragover' && !busy);
@@ -82,7 +97,7 @@ export function mount(root) {
         await new Promise(resolve => setTimeout(resolve, 0));
       }
       const count = entries.filter(entry => entry.result).length;
-      announce(`Готово: ${count} із ${entries.length}.` + (failed ? ` Помилок: ${failed}; ці файли не включено до завантаження.` : ' Можна скачати файли окремо або одним ZIP.'), failed > 0);
+      announce(`Готово: ${count} із ${entries.length}.` + (failed ? ` Помилок: ${failed}; ці файли не включено до завантаження.` : ' Очищені копії готові до завантаження.'), failed > 0);
     } finally { busy = false; render(); }
   };
   $('downloadZip').onclick = async () => {
@@ -90,19 +105,19 @@ export function mount(root) {
     busy = true; render(); announce('Готую ZIP із очищеними файлами…');
     try {
       const zip = new JSZip(), used = new Set();
-      const date = createMetadataDate();
+      const date = $('cleanMode').value === 'unique' ? createMetadataDate() : null;
       for (const entry of entries.filter(item => item.result)) {
         const base = outputName(entry.result), dot = base.lastIndexOf('.');
         let name = base, count = 1;
         while (used.has(name.toLowerCase())) { count++; name = dot > 0 ? `${base.slice(0, dot)} (${count})${base.slice(dot)}` : `${base} (${count})`; }
         used.add(name.toLowerCase());
-        zip.file(name, entry.result, { date, compression: 'STORE' });
+        zip.file(name, entry.result, { date: date || sourceZipDate(entry.file), compression: 'STORE' });
       }
       const blob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
       const url = URL.createObjectURL(blob), link = document.createElement('a');
       link.href = url; link.download = 'metadata-cleaned.zip'; link.click();
       setTimeout(() => URL.revokeObjectURL(url), 60000);
-      announce(`ZIP створено: ${used.size} файлів · ${formatSize(blob.size)}.`);
+      announce(`ZIP створено: ${used.size} файлів · ${formatSize(blob.size)}. ` + (date ? 'Дату й час унікалізовано.' : 'Дати початкових файлів збережено.'));
     } catch (error) { announce('Не вдалося створити ZIP: ' + error.message, true); }
     finally { busy = false; render(); }
   };
