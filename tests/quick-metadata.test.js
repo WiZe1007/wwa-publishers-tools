@@ -19,8 +19,8 @@ async function setup(files = [], clean = async file => file, options = {}) {
       async generateAsync() { return {}; }
     }
   });
-  const dependencies = new vm.SyntheticModule(['FIXED_DATE', 'metadataKind', 'stripImageMetadata', 'stripVideoMetadata'], function () {
-    this.setExport('FIXED_DATE', new Date('2020-01-01T00:00:00Z'));
+  const dependencies = new vm.SyntheticModule(['createMetadataDate', 'metadataKind', 'stripImageMetadata', 'stripVideoMetadata'], function () {
+    this.setExport('createMetadataDate', () => new Date('2018-05-17T11:23:46Z'));
     this.setExport('metadataKind', file => /\.png$/i.test(file.name) ? 'image' : null);
     this.setExport('stripImageMetadata', clean);
     this.setExport('stripVideoMetadata', clean);
@@ -45,7 +45,7 @@ test('generated results keep exact encoded bytes, dimensions/format and filename
     assert.equal(t.elements.cleanMetaDownload.download, name.replace(/(\.[^.]+)$/, '_clean$1'));
     assert.deepEqual(Buffer.from(await t.downloads[0].arrayBuffer()), Buffer.from(await output.arrayBuffer()));
     assert.equal(t.downloads[0].type, type);
-    assert.equal(t.downloads[0].lastModified, new Date('2020-01-01T00:00:00Z').getTime());
+    assert.equal(t.downloads[0].lastModified, new Date('2018-05-17T11:23:46Z').getTime());
     t.state.files = []; t.controller.refresh();
     assert.equal(t.elements.cleanMetaBtn.disabled, true);
     assert.equal(t.elements.cleanMetaDownload.hidden, true);
@@ -73,7 +73,7 @@ test('batch ZIP preserves duplicate names and excludes unsupported files', async
   await t.elements.cleanMetaBtn.onclick();
   assert.deepEqual(t.archived.map(item => item.name), ['same_clean.png', 'same_clean (2).png']);
   assert.equal(t.archived[0].options.compression, 'STORE');
-  assert.equal(t.archived[0].options.date.toISOString(), '2020-01-01T00:00:00.000Z');
+  assert.equal(t.archived[0].options.date.toISOString(), '2018-05-17T11:23:46.000Z');
   assert.equal(t.elements.cleanMetaDownload.download, 'metadata-cleaned.zip');
   assert.match(t.elements.cleanMetaStatus.textContent, /Очищено: 2 із 3/);
   assert.match(t.elements.cleanMetaStatus.textContent, /bad.gif/);

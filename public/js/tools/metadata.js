@@ -1,4 +1,4 @@
-import { FIXED_DATE, metadataKind, stripImageMetadata, stripVideoMetadata } from '../metadata.js';
+import { createMetadataDate, metadataKind, stripImageMetadata, stripVideoMetadata } from '../metadata.js';
 
 export function mount(root) {
   const $ = id => root.querySelector('#' + id);
@@ -90,12 +90,13 @@ export function mount(root) {
     busy = true; render(); announce('Готую ZIP із очищеними файлами…');
     try {
       const zip = new JSZip(), used = new Set();
+      const date = createMetadataDate();
       for (const entry of entries.filter(item => item.result)) {
         const base = outputName(entry.result), dot = base.lastIndexOf('.');
         let name = base, count = 1;
         while (used.has(name.toLowerCase())) { count++; name = dot > 0 ? `${base.slice(0, dot)} (${count})${base.slice(dot)}` : `${base} (${count})`; }
         used.add(name.toLowerCase());
-        zip.file(name, entry.result, { date: FIXED_DATE, compression: 'STORE' });
+        zip.file(name, entry.result, { date, compression: 'STORE' });
       }
       const blob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
       const url = URL.createObjectURL(blob), link = document.createElement('a');

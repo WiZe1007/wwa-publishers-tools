@@ -1,5 +1,26 @@
 // Shared by the standalone cleaner and Release Package. No network requests.
-export const FIXED_DATE = new Date('2020-01-01T00:00:00Z');
+const usedDates = new Set();
+const DATE_HISTORY_KEY = 'wwa.metadata.outputDates';
+
+export function createMetadataDate() {
+  // Remember generated dates across downloads and reloads, without file data.
+  try {
+    for (const time of JSON.parse(localStorage.getItem(DATE_HISTORY_KEY) || '[]')) {
+      if (Number.isFinite(time)) usedDates.add(time);
+    }
+  } catch { /* Storage may be blocked or cleared. Keep the in-memory history. */ }
+
+  const start = Date.UTC(2010, 0, 1);
+  const end = Date.UTC(new Date().getUTCFullYear() - 1, 0, 1);
+  const random = crypto.getRandomValues(new Uint32Array(1))[0];
+  // ZIP stores seconds in two-second units. Resolve collisions at that precision.
+  let time = start + Math.floor(random / 2 ** 32 * ((end - start) / 2000)) * 2000;
+  while (usedDates.has(time)) time = time + 2000 < end ? time + 2000 : start;
+  usedDates.add(time);
+  try { localStorage.setItem(DATE_HISTORY_KEY, JSON.stringify([...usedDates])); }
+  catch { /* Generated dates remain unique in this page when storage is blocked. */ }
+  return new Date(time);
+}
 export const isImage = file => (file.type || '').startsWith('image/');
 export const isVideo = file => (file.type || '').startsWith('video/') || /\.(mp4|mov|m4v)$/i.test(file.name);
 export function metadataKind(file) {
@@ -59,7 +80,7 @@ export async function stripImageMetadata(file) {
           if (!extension) { reject(new Error('Непідтримуваний вихідний формат.')); return; }
           const same = (blob.type === 'image/jpeg' && /\.jpe?g$/i.test(file.name)) || file.name.toLowerCase().endsWith('.' + extension);
           const name = same ? file.name : file.name.replace(/\.[^.]+$/, '') + '.' + extension;
-          resolve(new File([blob], name, { type: blob.type, lastModified: FIXED_DATE.getTime() }));
+          resolve(new File([blob], name, { type: blob.type, lastModified: createMetadataDate().getTime() }));
         }, type, .96);
       } catch (error) {
         URL.revokeObjectURL(url); canvas.width = canvas.height = 0; reject(error);
@@ -111,5 +132,5 @@ export async function stripVideoMetadata(file) {
   walk(0, buffer.byteLength, 0);
   if (!movie || !media) throw new Error('Потрібен самостійний файл MP4/MOV/M4V. Інші відеоформати не підтримуються.');
   // Return timestamp-only changes too; the old implementation discarded these.
-  return new File([buffer], file.name, { type: file.type || 'video/mp4', lastModified: FIXED_DATE.getTime() });
+  return new File([buffer], file.name, { type: file.type || 'video/mp4', lastModified: createMetadataDate().getTime() });
 }

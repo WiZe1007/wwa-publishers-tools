@@ -23,9 +23,9 @@ function extractFunction(file, name) {
 /* ─────────── Очищення метаданих відео ─────────── */
 describe('stripVideoMetadata — очищення MP4', () => {
   const source = 'async ' + extractFunction('js/metadata.js', 'stripVideoMetadata');
-  const FIXED_DATE = new Date('2020-01-01T00:00:00Z');
-  const strip = new Function('File', 'FIXED_DATE', `${source}; return stripVideoMetadata;`)(
-    globalThis.File || require('node:buffer').File, FIXED_DATE);
+  const outputDate = new Date('2018-05-17T11:23:46Z');
+  const strip = new Function('File', 'createMetadataDate', `${source}; return stripVideoMetadata;`)(
+    globalThis.File || require('node:buffer').File, () => outputDate);
 
   /** Мінімальний валідний MP4: ftyp + moov(mvhd + udta) + mdat */
   function buildMp4() {
@@ -123,7 +123,7 @@ describe('stripVideoMetadata — очищення MP4', () => {
 
   test('дата файлу нормалізується', async () => {
     const out = await strip(fakeFile(buildMp4()));
-    assert.strictEqual(out.lastModified, FIXED_DATE.getTime());
+    assert.strictEqual(out.lastModified, outputDate.getTime());
   });
 });
 

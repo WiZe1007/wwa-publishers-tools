@@ -1,4 +1,4 @@
-import { FIXED_DATE, isImage, isVideo, stripImageMetadata, stripVideoMetadata } from '../metadata.js';
+import { createMetadataDate, isImage, isVideo, stripImageMetadata, stripVideoMetadata } from '../metadata.js';
 import { requestJson, ensureAIReady } from '../http.js';
 import '../description-format.js';
 const { formatDescription } = globalThis.WWADescriptionFormat;
@@ -436,7 +436,7 @@ $('cleanMetaBtn').onclick = async () => {
     st.textContent = `✓ Очищено метадані: ${cleaned} зображень` +
       (cleanedVideo ? `, ${cleanedVideo} відео` : '') +
       (failed ? `, не вдалося: ${failed}` : '') +
-      `. Часові мітки в архіві буде уніфіковано.` +
+      `. Новий ZIP отримає випадкову дату й час із минулих років.` +
       (skipped.length ? ` Не чіпалися (щоб не пошкодити підпис): ${skipped.join(', ')}.` : '');
   } catch (e) {
     st.className = 'status err';
@@ -494,8 +494,8 @@ $('zipBtn').onclick = async () => {
     else order = state.screenshots.map((_, i) => i).slice(0, 8);
     if (state.screenshots.length <= 8) order = state.screenshots.map((_, i) => i);
 
-    // Якщо метадані чистили — однакова часова мітка для всіх записів архіву
-    const zipOpts = metaCleaned ? { date: FIXED_DATE } : undefined;
+    // Generate a new random timestamp for every cleaned package, including retries.
+    const zipOpts = metaCleaned ? { date: createMetadataDate() } : undefined;
 
     order.forEach((idx, n) => {
       const f = state.screenshots[idx].file;

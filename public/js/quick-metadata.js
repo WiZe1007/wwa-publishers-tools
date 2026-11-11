@@ -1,4 +1,4 @@
-import { FIXED_DATE, metadataKind, stripImageMetadata, stripVideoMetadata } from './metadata.js';
+import { createMetadataDate, metadataKind, stripImageMetadata, stripVideoMetadata } from './metadata.js';
 
 // generatedResults is only for trusted canvas output, never uploaded originals.
 // Canvas has already discarded source tags, so preserve encoded pixels/format.
@@ -42,7 +42,7 @@ export function mountQuickMetadata(root, getFiles, { generatedResults = false } 
           const kind = metadataKind(file);
           if (!generatedResults && !kind) throw new Error('Для очищення підтримуються JPEG, PNG, WebP, MP4, MOV та M4V.');
           const result = generatedResults
-            ? new File([file], file.name, { type: file.type, lastModified: FIXED_DATE.getTime() })
+            ? new File([file], file.name, { type: file.type, lastModified: createMetadataDate().getTime() })
             : await (kind === 'image' ? stripImageMetadata(file) : stripVideoMetadata(file));
           const name = uniqueCleanName(result.name, names);
           cleaned.push({ name, file: result });
@@ -58,7 +58,8 @@ export function mountQuickMetadata(root, getFiles, { generatedResults = false } 
         let blob = cleaned[0].file, name = cleaned[0].name;
         if (cleaned.length > 1) {
           const zip = new JSZip();
-          for (const item of cleaned) zip.file(item.name, item.file, { date: FIXED_DATE, compression: 'STORE' });
+          const date = createMetadataDate();
+          for (const item of cleaned) zip.file(item.name, item.file, { date, compression: 'STORE' });
           blob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
           name = 'metadata-cleaned.zip';
         }

@@ -21,8 +21,8 @@ async function mount(fetch, { health = '{"ok":true,"aiConfigured":true}', clipbo
     URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} },
     Image: class { width = 100; height = 100; set src(value) { this._src = value; queueMicrotask(() => this.onload()); } get src() { return this._src; } }
   });
-  const metadata = new vm.SyntheticModule(['FIXED_DATE', 'isImage', 'isVideo', 'stripImageMetadata', 'stripVideoMetadata'], function () {
-    this.setExport('FIXED_DATE', new Date());
+  const metadata = new vm.SyntheticModule(['createMetadataDate', 'isImage', 'isVideo', 'stripImageMetadata', 'stripVideoMetadata'], function () {
+    this.setExport('createMetadataDate', () => new Date('2018-05-17T11:23:46Z'));
     for (const name of ['isImage', 'isVideo', 'stripImageMetadata', 'stripVideoMetadata']) this.setExport(name, () => {});
   }, { context });
   const http = new vm.SourceTextModule(fs.readFileSync('public/js/http.js', 'utf8'), { context });
