@@ -167,7 +167,7 @@ function updFullCount() {
   const formatted = formatDescription($('fullDesc').value);
   $('fullCount').textContent = `(${len} символів${formatted.hasMarkup ? ' з HTML' : ''}, ціль ≤ ${max})`;
   $('fullCount').style.color = len > max ? 'var(--red)' : '';
-  $('descriptionPreviewPanel').hidden = !formatted.hasMarkup && tone !== 'aso_rich_html';
+  $('descriptionPreviewPanel').hidden = !formatted.hasMarkup && !['aso_rich_html', 'tiktok_aso_max_rich_html'].includes(tone);
   $('descriptionPreview').innerHTML = formatted.html;
   $('descriptionVisibleCount').textContent = `${Array.from(formatted.text).length} символів без тегів`;
   $('descriptionCopyStatus').textContent = '';
@@ -299,7 +299,7 @@ $('fixSpamBtn').onclick = async () => {
     const data = await requestJson('/api/fix-spam', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, appName: $('appName').value.trim() })
+      body: JSON.stringify({ text, appName: $('appName').value.trim(), tone })
     });
     if (typeof data.fullDescription !== 'string' || !data.fullDescription.trim() || !data.spamCheck)
       throw new Error('AI повернув неповний опис. Ваш поточний текст не змінено.');

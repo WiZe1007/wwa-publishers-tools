@@ -142,6 +142,9 @@ function repetitionScore(analysis) {
 const RICH_FORMAT_RULES = `ASO RICH HTML formatting: preserve a polished, readable full description using ONLY <b>, <i>, <u>, <font color="#D32F2F">, <font color="#0F766E"> and their closing tags. Use actual newlines between sections, not HTML layout tags. Never use CSS, style attributes, links, images, scripts or markdown.
 Start with 1-2 complete, compelling sentences as the FIRST paragraph, wrapped together in <b><font color="#D32F2F">...</font></b>: the opening must be RED AND BOLD. Do not put a separate heading before it. Preserve this red bold opening during every rewrite.
 Use bold section headings and short benefit labels, italics for one supporting sentence, underline only ONE brief key benefit, and at most TWO accent colors: red for the opening and teal for 2-3 section headings, e.g. <b><font color="#0F766E">Explore at your pace</font></b>. After the opening, keep body paragraphs plain, never color whole paragraphs or underline headings. Use every emphasis type purposefully, not all on the same phrase. Close and nest every tag correctly. Formatting tags and attributes do NOT count as words for repetition analysis, but DO count toward the character limit. Avoid repeating words in headings and body. Preserve all facts, negations, named controls and limitations. Never invent features.`;
+const RICH_HTML_TONES = new Set(['aso_rich_html', 'tiktok_aso_max_rich_html']);
+const TIKTOK_TONES = new Set(['tiktok_aso_pro', 'tiktok_aso_max', 'tiktok_aso_max_rich_html']);
+const TIKTOK_REPAIR_RULES = `CRITICAL: Do NOT modify the mandatory compliance sentences ("Cash Out Rules: Real-money cash-outs are strictly blocked..." and "In-App Purchases: ...") and do NOT remove the required phrases: "social casino experience", "simulated luck", "virtual progress", "Players interact with virtual elements", "do not represent real-money gambling". Reduce word repetition ONLY in other parts of the text. HTML may wrap headings and complete sentences, but never split a required phrase with tags.`;
 const TONE_INSTRUCTIONS = {
   normal: `Стиль опису — ЗВИЧАЙНИЙ:
 - Спокійний, дружній, інформативний тон.
@@ -282,6 +285,13 @@ TONE_INSTRUCTIONS.aso_rich_html = `${TONE_INSTRUCTIONS.aso_pro}
 ${RICH_FORMAT_RULES}
 Return the full_description as an HTML-formatted string INSIDE valid JSON. The short_description MUST remain plain text with no HTML or emojis. Respect the requested size INCLUDING all markup. Do not disclose any analysis or formatting instructions.`;
 
+TONE_INSTRUCTIONS.tiktok_aso_max_rich_html = `${TONE_INSTRUCTIONS.tiktok_aso_max}
+
+Стиль опису — TIKTOK × ASO PRO (ТОП) RICH HTML. Збережи всю методологію, структуру, семантичне ядро, SEO-абзац і обов'язкові фрази базового стилю вище. Оформи full_description за правилами нижче. Заголовки секцій можна виділити тегами, а обов'язкові фрази та речення залишай дослівними й суцільними всередині тегів.
+Вступ — 1–2 речення, червоні та жирні. Головне ключове слово має бути в перших 167 символах видимого тексту без тегів. Емодзі не використовуй.
+${RICH_FORMAT_RULES}
+Return the full_description as an HTML-formatted string INSIDE valid JSON. The short_description MUST remain plain text with no HTML or emojis. Respect the requested size INCLUDING all markup. Do not disclose any analysis or formatting instructions.`;
+
 // ===== Обсяг повного опису =====
 // Максимум повторів одного слова: щільність ≤ SPAM_DENSITY% від очікуваної кількості слів,
 // мінус 1 як запас міцності (слова ≈ 6.2 символи з пробілом)
@@ -364,8 +374,9 @@ app.post('/api/fix-spam', aiRequest, async (req, res) => {
   try {
     let text = String((req.body || {}).text || '').trim();
     const appName = String((req.body || {}).appName || 'the app');
+    const tone = String((req.body || {}).tone || '');
     if (!text) return res.status(400).json({ error: 'Текст порожній.' });
-    const preserveRedOpening = /^<b>\s*<font\s+color=["'](?:#d32f2f|red)["']>/i.test(text);
+    const preserveRedOpening = RICH_HTML_TONES.has(tone) || /^<b>\s*<font\s+color=["'](?:#d32f2f|red)["']>/i.test(text);
 
     let analysis = analyzeText(text);
     if (analysis.spam.length === 0) {
@@ -387,7 +398,8 @@ Over-used words:
 ${analysis.spam.map(s => `- "${s.word}" — used ${s.count} times (${s.density}%), must appear at most ${target} times`).join('\n')}
 
 Rewrite so every listed word appears at most ${target} times. Keep the meaning, features, structure, emojis, formatting and overall length unchanged. Do not add features. Before answering, check the final counts. Shortening the visible description can lower the repetition limit.
-${formatDescription(text).hasMarkup ? RICH_FORMAT_RULES : ''}
+${RICH_HTML_TONES.has(tone) || formatDescription(text).hasMarkup ? RICH_FORMAT_RULES : ''}
+${TIKTOK_TONES.has(tone) ? TIKTOK_REPAIR_RULES : ''}
 
 Description:
 ${text}
@@ -522,7 +534,7 @@ ${TONE_INSTRUCTIONS[tone] || TONE_INSTRUCTIONS.normal}
 
     // ===== Перевірка довгого опису на переспам + автовиправлення =====
     let fullDescription = String(parsed.full_description || '');
-    if (tone === 'aso_rich_html') fullDescription = emphasizeOpening(fullDescription);
+    if (RICH_HTML_TONES.has(tone)) fullDescription = emphasizeOpening(fullDescription);
     let analysis = analyzeText(fullDescription);
     let fixAttempts = 0;
     const MAX_FIX = req.ai.limit - req.ai.calls;
@@ -550,8 +562,7 @@ Rewrite the description so that:
 2. The meaning, features and overall length stay the same.
 3. Do NOT add features that are not mentioned.
 4. Keep it natural, high-quality English for Google Play.
-5. Keep the same marketing tone and energy as the original text, including all emojis and formatting.${tone === 'aso_rich_html' ? `\n${RICH_FORMAT_RULES}\nKeep the full_description within the requested size INCLUDING markup: ${SIZE_INSTRUCTIONS[size] || SIZE_INSTRUCTIONS.small}` : ''}${tone === 'aso_pro_alt' ? '\n6. Do NOT include any question and answer about an internet connection, network access or offline play (including "Q: Do I need an internet connection? A: ..."). Preserve other supported Q&A topics.' : ''}${(tone === 'tiktok_aso_pro' || tone === 'tiktok_aso_max') ? `
-6. CRITICAL: Do NOT modify the mandatory compliance sentences ("Cash Out Rules: Real-money cash-outs are strictly blocked..." and "In-App Purchases: ...") and do NOT remove the required phrases: "social casino experience", "simulated luck", "virtual progress", "Players interact with virtual elements", "do not represent real-money gambling". Reduce word repetition ONLY in other parts of the text.` : ''}
+5. Keep the same marketing tone and energy as the original text, including all emojis and formatting.${RICH_HTML_TONES.has(tone) ? `\n${RICH_FORMAT_RULES}\nKeep the full_description within the requested size INCLUDING markup: ${SIZE_INSTRUCTIONS[size] || SIZE_INSTRUCTIONS.small}` : ''}${tone === 'aso_pro_alt' ? '\n6. Do NOT include any question and answer about an internet connection, network access or offline play (including "Q: Do I need an internet connection? A: ..."). Preserve other supported Q&A topics.' : ''}${TIKTOK_TONES.has(tone) ? `\n6. ${TIKTOK_REPAIR_RULES}` : ''}
 
 Description:
 ${fullDescription}
@@ -562,7 +573,7 @@ Respond STRICTLY as JSON without markdown:
         if (typeof fixed?.full_description !== 'string' || !fixed.full_description.trim())
           throw Object.assign(new Error('invalid AI response'), { code: 'invalid_response' });
         fullDescription = fixed.full_description.trim();
-        if (tone === 'aso_rich_html') fullDescription = emphasizeOpening(fullDescription);
+        if (RICH_HTML_TONES.has(tone)) fullDescription = emphasizeOpening(fullDescription);
         analysis = analyzeText(fullDescription);
         if (repetitionScore(analysis) < repetitionScore(best.analysis)) best = { text: fullDescription, analysis };
       } catch (e) {
@@ -579,7 +590,7 @@ Respond STRICTLY as JSON without markdown:
     }
 
     let shortDescription = String(parsed.short_description || '').trim();
-    if (tone === 'aso_rich_html') shortDescription = formatDescription(shortDescription).text.trim();
+    if (RICH_HTML_TONES.has(tone)) shortDescription = formatDescription(shortDescription).text.trim();
     if (shortDescription.length > 80) {
       shortDescription = shortDescription.slice(0, 80);
       const cut = shortDescription.lastIndexOf(' ');

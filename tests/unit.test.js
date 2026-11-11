@@ -109,7 +109,7 @@ describe('Токенізація', () => {
 describe('Стилі та обсяги опису', () => {
   const EXPECTED_TONES = [
     'normal', 'normal_plus', 'semi', 'aggressive',
-    'aso_pro', 'aso_pro_alt', 'tiktok_aso_pro', 'tiktok_aso_max', 'aso_rich_html'
+    'aso_pro', 'aso_pro_alt', 'tiktok_aso_pro', 'tiktok_aso_max', 'aso_rich_html', 'tiktok_aso_max_rich_html'
   ];
 
   test('усі стилі мають інструкції', () => {
@@ -140,7 +140,7 @@ describe('Стилі та обсяги опису', () => {
   });
 
   test('compliance-стилі містять обов’язкові фрази', () => {
-    for (const tone of ['tiktok_aso_pro', 'tiktok_aso_max']) {
+    for (const tone of ['tiktok_aso_pro', 'tiktok_aso_max', 'tiktok_aso_max_rich_html']) {
       const t = TONE_INSTRUCTIONS[tone];
       for (const phrase of ['social casino experience', 'simulated luck', 'virtual progress',
                             'Players interact with virtual elements', 'do not represent real-money gambling',

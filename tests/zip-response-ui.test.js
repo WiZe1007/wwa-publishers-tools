@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 
-async function mount(fetch, { health = '{"ok":true,"aiConfigured":true}', clipboard = [] } = {}) {
+async function mount(fetch, { health = '{"ok":true,"aiConfigured":true}', clipboard = [], toneChoice } = {}) {
   const elements = new Map();
   function element() {
     return { value: '', textContent: '', innerHTML: '', disabled: false, style: { setProperty() {} },
@@ -31,7 +31,9 @@ async function mount(fetch, { health = '{"ok":true,"aiConfigured":true}', clipbo
   await descriptionFormat.link(() => {});
   const module = new vm.SourceTextModule(fs.readFileSync('public/js/tools/zip.js', 'utf8'), { context });
   await module.link(specifier => specifier === '../http.js' ? http : specifier === '../description-format.js' ? descriptionFormat : metadata); await module.evaluate();
-  module.namespace.mount({ querySelector: selector => $(selector.slice(1)), querySelectorAll: () => [] });
+  if (toneChoice) $('toneChoice').dataset.tone = toneChoice;
+  module.namespace.mount({ querySelector: selector => $(selector.slice(1)),
+    querySelectorAll: selector => toneChoice && selector === '#tones .tone' ? [$('toneChoice')] : [] });
   $('appName').value = 'Demo'; $('devDescription').value = 'A private offline garden guide.';
   $('shortDesc').value = 'Previous short.'; $('fullDesc').value = 'Previous full description.';
   $('shotsInput').files = [{ name: 'test.jpg', type: 'image/jpeg' }]; $('shotsInput').onchange();
@@ -55,6 +57,21 @@ test('ZIP successful response fills both descriptions and unlocks its button', a
   assert.equal($('shortDesc').value, 'Demo: Choose tasks.');
   assert.equal($('fullDesc').value, 'Choose tasks. Track progress.');
   assert.equal($('genBtn').disabled, false); assert.equal($('asoResults').style.display, '');
+});
+test('TikTok rich HTML selection enables preview and reaches generation and manual repair', async () => {
+  const requests = [];
+  const $ = await mount(async (url, options) => {
+    requests.push({ url, body: JSON.parse(options.body) });
+    return new Response(JSON.stringify({ shortDescription: 'Demo: Explore.', fullDescription: 'Explore gardens.',
+      spamCheck: { clean: true, remaining: [], frequency: [], maxAllowed: 1, totalWords: 2, densityLimit: 2.5 } }));
+  }, { toneChoice: 'tiktok_aso_max_rich_html' });
+  $('toneChoice').onclick();
+  assert.equal($('descriptionPreviewPanel').hidden, false);
+  await $('genBtn').onclick();
+  await $('fixSpamBtn').onclick();
+  assert.deepEqual(requests.map(request => [request.url, request.body.tone]), [
+    ['/api/aso', 'tiktok_aso_max_rich_html'], ['/api/fix-spam', 'tiktok_aso_max_rich_html']
+  ]);
 });
 test('ZIP rich result previews safe formatting and copies both original HTML and visible text', async () => {
   const clipboard = [];

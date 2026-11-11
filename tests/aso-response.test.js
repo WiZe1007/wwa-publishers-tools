@@ -58,7 +58,7 @@ test('a 1637-character description flags seven spins at 2.29% and accepts six af
   assert.equal(calls, 2);
 });
 
-test('rich HTML style reaches generation and repair while markup never dilutes repetition counts', async t => {
+for (const tone of ['aso_rich_html', 'tiktok_aso_max_rich_html']) test(`${tone} reaches generation and repair while markup never dilutes repetition counts`, async t => {
   let calls = 0;
   const richDraft = '<b><font color="#D32F2F">Explore gardens.</font></b>\n\n' + cleanText;
   const post = await fixture(t, async content => {
@@ -66,17 +66,38 @@ test('rich HTML style reaches generation and repair while markup never dilutes r
     assert.match(prompt, /ASO RICH HTML/);
     assert.match(prompt, /<b>/);
     assert.match(prompt, /#D32F2F/);
-    if (calls === 0) assert.match(prompt, /КРОК 1 — КЛЮЧОВІ СЛОВА/);
+    if (calls === 0) assert.match(prompt, tone === 'aso_rich_html' ? /КРОК 1 — КЛЮЧОВІ СЛОВА/ : /КРОК 1\. СЕМАНТИЧНЕ ЯДРО/);
+    if (tone === 'tiktok_aso_max_rich_html') {
+      assert.match(prompt, /Real-money cash-outs are strictly blocked/);
+      assert.match(prompt, /Players interact with virtual elements/);
+      assert.match(prompt, /do not represent real-money gambling/);
+    }
     if (++calls === 1) return JSON.stringify({ short_description: '<b>Demo</b>: Explore.', full_description: '<b>orchard</b> '.repeat(8) + cleanText });
     return JSON.stringify({ full_description: '<i>Explore gardens.</i>\n\n' + cleanText });
   });
-  const { status, data } = await post('/api/aso', { ...body, tone: 'aso_rich_html' });
+  const { status, data } = await post('/api/aso', { ...body, tone });
   assert.equal(status, 200);
   assert.equal(calls, 2);
   assert.equal(data.fullDescription, richDraft);
   assert.equal(data.shortDescription, 'Demo: Explore.');
   assert.equal(data.spamCheck.totalWords, 82);
   assert.equal(data.spamCheck.clean, true);
+});
+for (const markedUp of [true, false]) test(`manual repair of TikTok rich HTML carries formatting and compliance for ${markedUp ? 'HTML' : 'plain text'}`, async t => {
+  const post = await fixture(t, async content => {
+    assert.match(content[0].text, /ASO RICH HTML/);
+    assert.match(content[0].text, /Real-money cash-outs are strictly blocked/);
+    assert.match(content[0].text, /In-App Purchases/);
+    return JSON.stringify({ full_description: '<i>Explore gardens.</i>\n\n' + cleanText });
+  });
+  const { status, data } = await post('/api/fix-spam', {
+    tone: 'tiktok_aso_max_rich_html',
+    text: markedUp ? '<b><font color="#D32F2F">' + 'orchard '.repeat(8) + '</font></b>\n\n' + cleanText
+      : 'orchard '.repeat(8) + cleanText
+  });
+  assert.equal(status, 200);
+  assert.equal(data.fullDescription, '<b><font color="#D32F2F">Explore gardens.</font></b>\n\n' + cleanText);
+  assert.equal(data.usage.calls, 1);
 });
 for (const output of ['', '{"short_description":', '{}', 'null', '{"short_description":"Demo.","full_description":7}']) {
   test(`ASO rejects incomplete model data without an automatic paid retry: ${output || 'empty'}`, async t => {
