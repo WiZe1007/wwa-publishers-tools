@@ -9,6 +9,7 @@ const { createAiRequest, aiFailure } = require('./lib/ai-request');
 const { randomUUID } = require('node:crypto');
 const { formatDescription, emphasizeOpening, checkDescriptionFormat, repairDescriptionFormat } = require('./public/js/description-format');
 const { repetitionBudget, STRICT_DENSITY, CHARACTERS_PER_USE } = require('./lib/repetition-policy');
+const { RED_OPENING_COPY } = require('./lib/description-prompts');
 
 // Simple .env loader (no dependency needed)
 const envPath = path.join(__dirname, '.env');
@@ -141,6 +142,7 @@ function repetitionScore(analysis) {
 // ===== Стилі опису =====
 const RICH_FORMAT_RULES = `ASO RICH HTML formatting: preserve a polished, readable full description using ONLY <b>, <i>, <u>, <font color="#D32F2F">, <font color="#0F766E"> and their closing tags. Use actual newlines between sections, not HTML layout tags. Never use CSS, style attributes, links, images, scripts or markdown.
 Start with 1-2 complete, compelling sentences as the FIRST paragraph, wrapped together in <b><font color="#D32F2F">...</font></b>: the opening must be RED AND BOLD. Do not put a separate heading before it. Preserve this red bold opening during every rewrite.
+${RED_OPENING_COPY}
 Use bold section headings and short benefit labels, italics for one supporting sentence, underline only ONE brief key benefit, and at most TWO accent colors: red for the opening and teal for 2-3 section headings, e.g. <b><font color="#0F766E">Explore at your pace</font></b>. After the opening, keep body paragraphs plain, never color whole paragraphs or underline headings. Use every emphasis type purposefully, not all on the same phrase. Close and nest every tag correctly. Formatting tags and attributes do NOT count as words for repetition analysis, but DO count toward the character limit. Avoid repeating words in headings and body. Preserve all facts, negations, named controls and limitations. Never invent features.`;
 const RICH_HTML_TONES = new Set(['aso_rich_html', 'tiktok_aso_max_rich_html']);
 const TIKTOK_TONES = new Set(['tiktok_aso_pro', 'tiktok_aso_max', 'tiktok_aso_max_rich_html']);
