@@ -225,6 +225,8 @@
       <label class="fld"><b>Full description <span class="hint" id="fullCount" style="display:inline"></span></b>
         <textarea id="fullDesc" style="min-height:220px"></textarea>
       </label>
+      <p class="status" id="descriptionFormatStatus" role="status" aria-live="polite"></p>
+      <button class="btn small secondary" id="fixDescriptionFormatBtn" type="button" hidden>Виправити оформлення · без AI</button>
       <details class="description-preview-panel" id="descriptionPreviewPanel" hidden open>
         <summary>Попередній перегляд опису</summary>
         <div class="row description-copy-actions">
@@ -233,7 +235,7 @@
           <span class="hint" id="descriptionVisibleCount"></span>
         </div>
         <div class="description-preview" id="descriptionPreview" role="region" aria-label="Оформлений повний опис" tabindex="0" dir="auto"></div>
-        <p class="hint">HTML зберігається у ZIP. Назва та короткий опис — без тегів. Вигляд у Google Play може відрізнятися.</p>
+        <p class="hint">HTML зберігається у ZIP. Для інших мов додавайте окремі перевірені локалізації: автоматичний переклад Google Play може змінити теги після публікації.</p>
         <div class="status" id="descriptionCopyStatus" role="status" aria-live="polite"></div>
       </details>
       <div class="row">

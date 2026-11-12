@@ -28,7 +28,9 @@ async function mount() {
         return check(source, createBrandProtection(source, body.reference));
       })() : state.respond(JSON.parse(options.body)) }) });
   const module = new vm.SourceTextModule(fs.readFileSync('public/js/tools/localize.js', 'utf8'), { context });
-  await module.link(() => {}); await module.evaluate();
+  const formatting = new vm.SourceTextModule(fs.readFileSync('public/js/description-format.js', 'utf8'), { context });
+  await formatting.link(() => {});
+  await module.link(() => formatting); await module.evaluate();
   module.namespace.mount({ querySelector: selector => $(selector.slice(1)) });
   await new Promise(resolve => setImmediate(resolve));
   $('locale').value = 'pl'; $('sourceTitle').value = valid.title;
@@ -46,6 +48,18 @@ test('copy and downloaded UTF-8 text contain all checked localized fields', asyn
   assert.equal(state.link.download, 'aso-pl.txt'); assert.equal(state.link.clicked, true);
   assert.equal(await state.blob.text(), state.copied);
   for (const value of [valid.title, valid.shortDescription, valid.fullDescription]) assert.ok(state.copied.includes(value));
+});
+
+test('Localize blocks broken color scopes and repairs formatting without paid translation', async () => {
+  const { $, state } = await mount();
+  state.respond = () => assert.fail('Free formatting repair must not translate');
+  $('sourceFull').value = '<b><font color="red">Wybierz zadanie.\n\nUstaw minutnik.</font></b>';
+  await $('checkSource').onclick();
+  assert.equal($('copyFull').disabled, true);
+  assert.match($('resultFormatStatus').textContent, /Колір|Червоним|абзац/);
+  await $('fixResultFormat').onclick();
+  assert.equal($('copyFull').disabled, false);
+  assert.equal(require('../public/js/description-format').formatDescription($('resultFull').value).text, 'Wybierz zadanie.\n\nUstaw minutnik.');
 });
 test('manual edits invalidate ready state; checks block spam then allow repaired output', async () => {
   const { $, generate } = await mount(); await generate();

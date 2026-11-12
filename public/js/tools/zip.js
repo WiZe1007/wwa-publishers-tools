@@ -1,7 +1,7 @@
 import { createMetadataDate, isImage, isVideo, stripImageMetadata, stripVideoMetadata } from '../metadata.js';
 import { requestJson, ensureAIReady } from '../http.js';
 import '../description-format.js';
-const { formatDescription } = globalThis.WWADescriptionFormat;
+const { formatDescription, checkDescriptionFormat, repairDescriptionFormat } = globalThis.WWADescriptionFormat;
 
 // Each tool owns its DOM and state, including while detached during navigation.
 export function mount(root) {
@@ -171,12 +171,20 @@ function updFullCount() {
   $('descriptionPreview').innerHTML = formatted.html;
   $('descriptionVisibleCount').textContent = `${Array.from(formatted.text).length} символів без тегів`;
   $('descriptionCopyStatus').textContent = '';
+  const check = checkDescriptionFormat($('fullDesc').value);
+  $('descriptionFormatStatus').textContent = check.valid ? '✓ Оформлення перевірено.' : check.issues.map(item => item.message).join(' ');
+  $('descriptionFormatStatus').className = 'status ' + (check.valid ? 'ok' : 'err');
+  $('fixDescriptionFormatBtn').hidden = check.valid;
+  $('copyHtmlBtn').disabled = !check.valid;
 }
 
 async function copyDescription(plain) {
   const status = $('descriptionCopyStatus');
   try {
     const source = $('fullDesc').value;
+    if (!plain && !checkDescriptionFormat(source).valid) {
+      status.className = 'status err'; status.textContent = 'Спочатку виправте оформлення опису.'; return;
+    }
     await navigator.clipboard.writeText(plain ? formatDescription(source).text : source);
     status.className = 'status ok';
     status.textContent = plain ? 'Текст скопійовано.' : 'HTML скопійовано.';
@@ -187,6 +195,12 @@ async function copyDescription(plain) {
 }
 $('copyHtmlBtn').onclick = () => copyDescription(false);
 $('copyPlainBtn').onclick = () => copyDescription(true);
+$('fixDescriptionFormatBtn').onclick = () => {
+  $('fullDesc').value = repairDescriptionFormat($('fullDesc').value);
+  updFullCount();
+  zipForce = false; $('zipBtn').textContent = '📦 Створити та скачати ZIP';
+  $('descriptionCopyStatus').textContent = 'Оформлення виправлено без AI. Перевірте вигляд нижче; зміст збережено.';
+};
 
 // ================= Short description counter =================
 $('shortDesc').addEventListener('input', updCount);
@@ -454,6 +468,11 @@ $('fullDesc').addEventListener('input', () => {
 $('zipBtn').onclick = async () => {
   const st = $('zipStatus');
   st.className = 'status';
+  if (!checkDescriptionFormat($('fullDesc').value).valid) {
+    updFullCount(); $('asoResults').style.display = '';
+    st.className = 'status err'; st.textContent = 'Виправте оформлення опису перед створенням ZIP. Кнопка «Виправити оформлення» — під повним описом.';
+    return;
+  }
   const name = $('appName').value.trim();
   if (!name) { st.className = 'status err'; st.textContent = 'Заповніть назву додатку.'; return; }
   if (state.screenshots.length === 0) { st.className = 'status err'; st.textContent = 'Додайте скріншоти.'; return; }

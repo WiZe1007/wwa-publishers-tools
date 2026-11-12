@@ -29,6 +29,24 @@ test('ASO successful generation returns both fields and makes one provider call'
   assert.equal(data.fullDescription, cleanText); assert.equal(data.shortDescription, draft.short_description);
 });
 
+test('ASO repairs leaking AI color scopes without another provider call', async t => {
+  let calls = 0;
+  const broken = '<b><font color="red">Explore gardens.\n\n' + cleanText + '</font></b>';
+  const post = await fixture(t, async () => { calls++; return JSON.stringify({ ...draft, full_description: broken }); });
+  const { data, status } = await post('/api/aso', { ...body, tone: 'aso_rich_html' });
+  const { checkDescriptionFormat, formatDescription } = require('../public/js/description-format');
+  assert.equal(status, 200); assert.equal(calls, 1);
+  assert.equal(checkDescriptionFormat(data.fullDescription).valid, true);
+  assert.equal(formatDescription(data.fullDescription).text, formatDescription(broken).text);
+});
+
+test('manual formatting defects are repaired for free when there is no repetition to rewrite', async t => {
+  const post = await fixture(t, () => assert.fail('A formatting repair must not call Claude'));
+  const { data, status } = await post('/api/fix-spam', { text: '<b><font color="red">Explore gardens.\n\n' + cleanText + '</font></b>' });
+  assert.equal(status, 200); assert.equal(data.fixAttempts, 0);
+  assert.equal(require('../public/js/description-format').checkDescriptionFormat(data.fullDescription).valid, true);
+});
+
 test('a 1637-character description flags seven spins at 2.29% and accepts six after repair', async t => {
   const words = ['spin', 'spin', 'spin', 'spin', 'spins', 'spins', 'spinning',
     ...Array(6).fill('reels'), ...Array(12).fill('and')];

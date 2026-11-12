@@ -122,3 +122,24 @@ test('ZIP manual repair also checks the host before a paid request', async () =>
   assert.equal($('fixSpamBtn').disabled, false);
   assert.match($('spamStatus').textContent, /AI-запит не надсилався/);
 });
+
+test('ZIP blocks malformed HTML copying and offers free repair without changing visible text', async () => {
+  const clipboard = [];
+  const $ = await mount(() => assert.fail('Formatting repair must not use AI'), { clipboard });
+  $('fullDesc').value = '<b><font color="red">First. Second.\n\nBody text.</font></b>';
+  $('fullDesc').listeners.input();
+  assert.equal($('copyHtmlBtn').disabled, true);
+  await $('copyHtmlBtn').onclick(); assert.equal(clipboard.length, 0);
+  $('fixDescriptionFormatBtn').onclick();
+  assert.equal($('copyHtmlBtn').disabled, false);
+  await $('copyHtmlBtn').onclick();
+  assert.equal(require('../public/js/description-format').formatDescription(clipboard[0]).text, 'First. Second.\n\nBody text.');
+});
+
+test('ZIP export never bypasses a formatting defect even after a second click', async () => {
+  const $ = await mount(() => assert.fail('Invalid HTML must stop export before network requests'));
+  $('fullDesc').value = '<font color="red">First.\n\nBody.</font>';
+  await $('zipBtn').onclick(); await $('zipBtn').onclick();
+  assert.match($('zipStatus').textContent, /оформлення/i);
+  assert.equal($('zipBtn').disabled, false);
+});

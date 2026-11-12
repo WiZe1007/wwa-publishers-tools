@@ -102,6 +102,25 @@ test('language API and checking work without an AI key or external calls', async
   assert.equal((await post()).status, 503);
   assert.equal((await post('', {})).status, 400);
 });
+
+test('Localize normalizes malformed AI formatting without another paid request', async t => {
+  const broken = '<b><font color="red">' + clean.fullDescription + '</font></b>';
+  let calls = 0;
+  const post = await fixture(t, { callClaude: async () => { calls++; return JSON.stringify({ ...clean, fullDescription: broken }); } });
+  const { status, data } = await post('', { ...clean, profile: 'natural' });
+  assert.equal(status, 200);
+  assert.equal(data.checks.formatting.valid, true);
+  assert.equal(require('../public/js/description-format').formatDescription(data.fullDescription).text, clean.fullDescription);
+  assert.equal(calls, 1);
+});
+
+test('Localize fallback preserves the source text with repaired formatting when AI drafts are worse', async t => {
+  const source = { ...clean, mode: 'repair', profile: 'natural', fullDescription: '<b>Explore nature.\n\nReview progress.' };
+  const post = await fixture(t, { callClaude: async () => JSON.stringify({ ...source, fullDescription: 'Echo echo echo echo echo echo echo echo echo.' }) });
+  const { data } = await post('', source);
+  assert.equal(data.checks.formatting.valid, true);
+  assert.equal(require('../public/js/description-format').formatDescription(data.fullDescription).text, 'Explore nature.\n\nReview progress.');
+});
 test('HTTP checker detects native-script repetition in every offered locale without Claude', async t => {
   const words = require('./fixtures/native-keywords');
   const post = await fixture(t, { isConfigured: () => false, callClaude: () => assert.fail('Repetition checks must not call AI') });
@@ -111,7 +130,7 @@ test('HTTP checker detects native-script repetition in every offered locale with
     assert.equal(status, 200, code);
     assert.equal(data.clean, false, code);
     assert.ok(data.analyses.fullDescription.spam.length, code);
-    assert.equal(data.version, 'quality-v7');
+    assert.equal(data.version, 'quality-v8');
   }
 });
 test('successful generation checks every field and sends source as JSON data', async t => {

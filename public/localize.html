@@ -62,7 +62,8 @@
           <p class="hint">У результаті: назва до 30, короткий опис до 80, повний — до 4000 символів.</p>
           <p class="settings-help">Для перекладу та AI-правок текст надсилається Anthropic. Не додавайте конфіденційні дані.</p>
           <button class="btn" id="generate" type="submit" disabled>Перекласти та перевірити</button>
-          <button class="btn secondary" id="checkSource" type="button" disabled>Лише перевірити повтори</button>
+          <p id="sourceFormatStatus" class="status err" role="status" hidden></p>
+          <button class="btn secondary" id="checkSource" type="button" disabled>Перевірити текст · без AI</button>
         </fieldset>
       </form>
       <button class="btn secondary" id="cancelGeneration" type="button" hidden>Скасувати запит</button>
@@ -78,6 +79,14 @@
         <label class="fld"><b>Локалізований короткий опис <span class="localization-count" id="shortCount">0 / 80</span></b><textarea id="resultShort" rows="3" dir="auto"></textarea></label>
         <label class="fld"><b>Локалізований повний опис <span class="localization-count" id="fullCount">0 / 4000</span></b><textarea id="resultFull" rows="12" dir="auto"></textarea></label>
       </fieldset>
+      <section id="resultFormatPanel" class="description-preview-panel" aria-label="Перевірка оформлення" hidden>
+        <p id="resultFormatStatus" class="status" role="status" aria-live="polite"></p>
+        <button id="fixResultFormat" class="btn secondary" type="button" hidden>Виправити оформлення · без AI</button>
+        <details><summary>Попередній перегляд</summary>
+          <div id="resultFormatPreview" class="description-preview" role="region" aria-label="Оформлений переклад" dir="auto" tabindex="0"></div>
+        </details>
+        <p class="hint">Перевіряємо теги, вкладеність і межі кольору. Для інших мов додавайте окремі локалізації: Google Play може змінити HTML під час автоматичного перекладу.</p>
+      </section>
       <p id="resultNotice" class="privacy-note" role="status" hidden></p>
       <div id="checkReport" class="localization-report" hidden>
         <p id="checkSummary" role="status" aria-live="polite"></p>

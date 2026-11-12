@@ -7,7 +7,7 @@ const path = require('path');
 const fs = require('fs');
 const { createAiRequest, aiFailure } = require('./lib/ai-request');
 const { randomUUID } = require('node:crypto');
-const { formatDescription, emphasizeOpening } = require('./public/js/description-format');
+const { formatDescription, emphasizeOpening, checkDescriptionFormat, repairDescriptionFormat } = require('./public/js/description-format');
 const { repetitionBudget, STRICT_DENSITY, CHARACTERS_PER_USE } = require('./lib/repetition-policy');
 
 // Simple .env loader (no dependency needed)
@@ -376,6 +376,7 @@ app.post('/api/fix-spam', aiRequest, async (req, res) => {
     const appName = String((req.body || {}).appName || 'the app');
     const tone = String((req.body || {}).tone || '');
     if (!text) return res.status(400).json({ error: 'Текст порожній.' });
+    if (!checkDescriptionFormat(text).valid) text = repairDescriptionFormat(text);
     const preserveRedOpening = RICH_HTML_TONES.has(tone) || /^<b>\s*<font\s+color=["'](?:#d32f2f|red)["']>/i.test(text);
 
     let analysis = analyzeText(text);
@@ -418,6 +419,7 @@ Respond STRICTLY as JSON without markdown:
       }
       text = fixed.full_description.trim();
       if (preserveRedOpening) text = emphasizeOpening(text);
+      if (!checkDescriptionFormat(text).valid) text = repairDescriptionFormat(text);
       analysis = analyzeText(text);
       if (repetitionScore(analysis) < repetitionScore(best.analysis)) best = { text, analysis };
     }
@@ -535,6 +537,7 @@ ${TONE_INSTRUCTIONS[tone] || TONE_INSTRUCTIONS.normal}
     // ===== Перевірка довгого опису на переспам + автовиправлення =====
     let fullDescription = String(parsed.full_description || '');
     if (RICH_HTML_TONES.has(tone)) fullDescription = emphasizeOpening(fullDescription);
+    if (!checkDescriptionFormat(fullDescription).valid) fullDescription = repairDescriptionFormat(fullDescription);
     let analysis = analyzeText(fullDescription);
     let fixAttempts = 0;
     const MAX_FIX = req.ai.limit - req.ai.calls;
@@ -574,6 +577,7 @@ Respond STRICTLY as JSON without markdown:
           throw Object.assign(new Error('invalid AI response'), { code: 'invalid_response' });
         fullDescription = fixed.full_description.trim();
         if (RICH_HTML_TONES.has(tone)) fullDescription = emphasizeOpening(fullDescription);
+        if (!checkDescriptionFormat(fullDescription).valid) fullDescription = repairDescriptionFormat(fullDescription);
         analysis = analyzeText(fullDescription);
         if (repetitionScore(analysis) < repetitionScore(best.analysis)) best = { text: fullDescription, analysis };
       } catch (e) {

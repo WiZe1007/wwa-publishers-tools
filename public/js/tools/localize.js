@@ -1,3 +1,5 @@
+import '../description-format.js';
+const { formatDescription, checkDescriptionFormat, repairDescriptionFormat } = globalThis.WWADescriptionFormat;
 const fields = ['title', 'shortDescription', 'fullDescription'];
 const sourceIds = ['sourceTitle', 'sourceShort', 'sourceFull'];
 const resultIds = ['resultTitle', 'resultShort', 'resultFull'];
@@ -20,6 +22,7 @@ export function simpleFixes(checks) {
     if (checks.editor?.issues.some(item => item.field === field)) fixes.push(`${label}: AI знайшов неточності в мові або змісті. Натисніть «Виправити з AI» або перегляньте деталі.`);
   }
   if (checks.issues.some(issue => issue.includes('письма'))) fixes.push('Повний опис написано не обраною мовою. Перекладіть його ще раз.');
+  for (const item of checks.formatting?.issues || []) fixes.push(item.message);
   if (!checks.clean && !fixes.length) fixes.push('Перевірку не завершено. Спробуйте ще раз — ваш текст збережено.');
   return fixes;
 }
@@ -98,11 +101,23 @@ export function mount(root) {
     $('cancelGeneration').hidden = !busy;
     $('checkResult').disabled = busy || !hasResult;
     $('repairResult').disabled = busy || !hasResult;
-    const ready = !busy && hasResult && checkedSnapshot === snapshot();
+    const formatting = renderFormatting();
+    const ready = !busy && hasResult && checkedSnapshot === snapshot() && formatting.valid;
     $('copyResult').disabled = !ready;
     $('downloadResult').disabled = !ready;
     $('copyFull').disabled = !ready;
     $('resultPanel').setAttribute('aria-busy', String(busy));
+  }
+  function renderFormatting() {
+    const check = checkDescriptionFormat($('resultFull').value, { locale: resultLocale || 'en' });
+    $('resultFormatPanel').hidden = !hasResult || (!check.hasMarkup && check.valid);
+    $('resultFormatStatus').textContent = check.valid ? '✓ Оформлення перевірено.' : check.issues.map(item => item.message).join(' ');
+    $('resultFormatStatus').className = 'status ' + (check.valid ? 'ok' : 'err');
+    $('fixResultFormat').hidden = check.valid;
+    $('fixResultFormat').disabled = busy || !hasResult;
+    $('resultFormatPreview').innerHTML = formatDescription($('resultFull').value).html;
+    $('resultFormatPreview').lang = resultLocale;
+    return check;
   }
   function counters() {
     resultIds.forEach((id, index) => {
@@ -146,7 +161,7 @@ export function mount(root) {
     $('checkReport').hidden = false;
     $('checkReport').dataset.state = checks.clean && !['unavailable', 'needs_revision'].includes(checks.editor?.status) ? 'clean' : 'warning';
     const fixes = simpleFixes(checks);
-    $('checkSummary').textContent = checks.clean ? '✓ Зайвих повторів не знайдено'
+    $('checkSummary').textContent = checks.formatting?.valid === false ? 'Виправте оформлення опису' : checks.clean ? '✓ Зайвих повторів не знайдено'
       : Object.values(checks.analyses).some(item => item.spam.length || item.sentences?.length || item.phrases?.some(phrase => phrase.excessive))
         ? 'Є зайві повтори' : 'Потрібні правки';
     $('checkIssues').replaceChildren(...fixes.slice(0, 3).map(issue => {
@@ -215,6 +230,9 @@ export function mount(root) {
     counters(); stale('Текст змінено. Натисніть «Перевірити ще раз».');
   });
   $('sourceFields').addEventListener('input', () => {
+    const check = checkDescriptionFormat($('sourceFull').value, { locale: $('locale').value || 'en' });
+    $('sourceFormatStatus').hidden = check.valid;
+    $('sourceFormatStatus').textContent = check.issues.map(item => item.message).join(' ') + ' Натисніть «Перевірити текст», щоб виправити оформлення без AI.';
     if (hasResult && JSON.stringify(source()) !== sourceSnapshot)
       $('generationStatus').textContent = 'Ви змінили текст або мову. Натисніть «Перекласти та перевірити», щоб оновити результат.';
   });
@@ -305,6 +323,12 @@ export function mount(root) {
     }
     finally { if (version === checkVersion) buttons(); }
   };
+  $('fixResultFormat').onclick = async () => {
+    if (busy || !hasResult) return;
+    $('resultFull').value = repairDescriptionFormat($('resultFull').value, { locale: resultLocale || 'en' });
+    counters(); stale('Оформлення виправлено без AI. Перевіряємо текст…');
+    await $('checkResult').onclick();
+  };
   $('checkProfile').addEventListener('change', () => {
     $('profileHelp').textContent = profile() === 'natural' ? 'Перевіряємо основні слова. Часті «і», «в», «на» та подібні слова не вважаємо проблемою.' : 'Перевіряємо всі слова, навіть «і», «в» та «на». Це суворіший режим.';
     if (hasResult) { stale('Профіль змінено. Перевіряємо текст за новими правилами…'); return $('checkResult').onclick(); }
@@ -322,17 +346,17 @@ export function mount(root) {
     return `Language: ${resultLocale}\n\nTitle\n${data.title}\n\nShort description\n${data.shortDescription}\n\nFull description\n${data.fullDescription}\n`;
   };
   $('copyResult').onclick = async () => {
-    if (busy || checkedSnapshot !== snapshot()) return;
+    if (busy || checkedSnapshot !== snapshot() || !renderFormatting().valid) return;
     try { await navigator.clipboard.writeText(exportText()); $('resultStatus').textContent = 'Скопійовано всі три поля.'; }
     catch { $('resultStatus').textContent = 'Браузер не дозволив копіювання. Виділіть текст вручну або завантажте .txt.'; }
   };
   $('copyFull').onclick = async () => {
-    if (busy || checkedSnapshot !== snapshot()) return;
+    if (busy || checkedSnapshot !== snapshot() || !renderFormatting().valid) return;
     try { await navigator.clipboard.writeText(result().fullDescription); $('resultStatus').textContent = 'Повний опис скопійовано без заголовків і службових підписів — для перевірки в іншому аналізаторі.'; }
     catch { $('resultStatus').textContent = 'Не вдалося скопіювати. Виділіть текст вручну.'; }
   };
   $('downloadResult').onclick = () => {
-    if (busy || checkedSnapshot !== snapshot()) return;
+    if (busy || checkedSnapshot !== snapshot() || !renderFormatting().valid) return;
     const url = URL.createObjectURL(new Blob([exportText()], { type: 'text/plain;charset=utf-8' }));
     const link = document.createElement('a'); link.href = url; link.download = `aso-${resultLocale}.txt`;
     document.body.append(link); link.click(); link.remove();
