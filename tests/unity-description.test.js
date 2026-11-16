@@ -80,7 +80,7 @@ for (const tone of ['tiktok_aso_unity', 'tiktok_aso_unity_rich_html', 'aso_pro_a
           assert.match(prompt, new RegExp(`RNG wording: ${mode.toUpperCase()}`));
           assert.match(prompt, mode === 'certified'
             ? /RNG certification: CONFIRMED/ : /RNG certification: NOT CONFIRMED/);
-          assert.match(prompt, /Terms and Conditions/);
+          assert.match(prompt, tone === 'aso_pro_alt_unity' ? /Before you play/ : /Terms and Conditions/);
           if (mode === 'omit') {
             assert.match(prompt, /Omit the "Random Outcomes" section/);
             assert.match(prompt, /do not add or retain a separate randomness\/RNG explanation/);
@@ -120,12 +120,44 @@ test('Alternative Unity generation combines its narrative presentation with Unit
   const { status, data } = await post('/api/aso', { ...payload, tone: alternativeTone });
   assert.equal(status, 200);
   assert.match(prompts[0], /ASO PRO ALTERNATIVE PRESENTATION/);
-  assert.match(prompts[0], /Terms and Conditions/);
+  assert.match(prompts[0], /Before you play/);
   assert.match(prompts[0], /ALTERNATIVE PROSE ONLY/);
   assert.doesNotMatch(prompts[0], /Жодних тем удачі\/казино\/азарту|ASO RICH HTML/);
   assert.equal(data.fullDescription, clean);
   assert.equal(prompts.length, 1);
 });
+
+for (const tone of ['aso_pro_alt_unity', 'tiktok_aso_unity', 'tiktok_aso_unity_rich_html']) {
+  for (const operation of ['generate', 'automatic repair', 'manual repair']) {
+    test(`${tone} keeps its distinct disclosure layout during ${operation}`, async t => {
+      const { post, prompts } = await fixture(t, operation === 'automatic repair' ? [repeated, clean] : [clean]);
+      const route = operation === 'manual repair' ? '/api/fix-spam' : '/api/aso';
+      const { status } = await post(route, { ...payload, tone, text: repeated });
+      assert.equal(status, 200);
+      assert.equal(prompts.length, operation === 'automatic repair' ? 2 : 1);
+      for (const prompt of prompts) {
+        assert.match(prompt, /Success in social casino games does not guarantee future success in real-money gambling/);
+        if (tone === 'aso_pro_alt_unity') {
+          assert.match(prompt, /section headed "Before you play"/);
+          assert.match(prompt, /exactly two compact paragraphs/);
+          assert.match(prompt, /immediately before the final calm invitation/);
+          assert.match(prompt, /overrides any instruction to preserve the source\/draft structure/);
+          assert.match(prompt, /Convert an existing numbered Terms and Conditions block/);
+          assert.match(prompt, /aged 18 and above/);
+          assert.match(prompt, /entertainment only/);
+          assert.match(prompt, /no real-money gambling, cash winnings or prizes of monetary value/);
+          assert.match(prompt, /coins, credits and rewards are virtual/);
+          assert.match(prompt, /cannot be withdrawn, exchanged for cash or redeemed for prizes of real-world value/);
+          assert.doesNotMatch(prompt, /must end with a section headed "Terms and Conditions"|four short numbered points|Then append the required Terms and Conditions|four numbered Terms and Conditions/);
+        } else {
+          assert.match(prompt, /must end with a section headed "Terms and Conditions"/);
+          assert.match(prompt, /four short numbered points/);
+          assert.doesNotMatch(prompt, /section headed "Before you play"|exactly two compact paragraphs/);
+        }
+      }
+    });
+  }
+}
 
 for (const route of ['/api/aso', '/api/fix-spam']) test(`Alternative Unity ${route} repair retains narrative without Q&A`, async t => {
   const { post, prompts } = await fixture(t, route === '/api/aso' ? [repeated, `<i>${clean}</i>`] : [`<i>${clean}</i>`]);
@@ -136,7 +168,7 @@ for (const route of ['/api/aso', '/api/fix-spam']) test(`Alternative Unity ${rou
   assert.equal(data.spamCheck.clean, true);
   assert.match(prompts.at(-1), /ASO PRO ALTERNATIVE PRESENTATION/);
   assert.match(prompts.at(-1), /Do not include or retain a Q&A, FAQ/);
-  assert.match(prompts.at(-1), /Terms and Conditions/);
+  assert.match(prompts.at(-1), /Before you play/);
   assert.match(prompts.at(-1), /RNG certification: NOT CONFIRMED/);
   assert.doesNotMatch(prompts.at(-1), /ASO RICH HTML|Real-money cash-outs are strictly blocked/);
 });
@@ -157,7 +189,7 @@ for (const tone of ['aso_pro_alt', 'aso_pro_alt_unity']) {
         assert.match(prompt, /Preserve sourced facts, numbers, limitations and required disclosures/);
         assert.doesNotMatch(prompt, /add a compact Q&A|міні-блок питань і відповідей|Preserve other supported Q&A|same narrative sections and supported Q&A/);
       }
-      if (tone === 'aso_pro_alt_unity') assert.match(prompts.at(-1), /Terms and Conditions/);
+      if (tone === 'aso_pro_alt_unity') assert.match(prompts.at(-1), /Before you play/);
     });
   }
 }
