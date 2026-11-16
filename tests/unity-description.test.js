@@ -1,11 +1,28 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { app } = require('../server');
+const { app, analyzeText } = require('../server');
+const { unityDescriptionRules } = require('../lib/description-prompts');
 
 const clean = Array.from({ length: 100 }, (_, i) => `detail${i}`).join(' ');
 const repeated = 'orchard '.repeat(12) + clean;
 const payload = { appName: 'Demo', description: 'A social casino with three reels, BAR symbols, virtual stakes and a SPIN button.',
   tone: 'tiktok_aso_unity', size: 'small', screenshots: [] };
+
+for (const rich of [false, true]) test(`mandatory Unity Terms fit the small ${rich ? 'rich' : 'plain'} repetition budget`, () => {
+  // Simulate an output following the actual numbered disclosures sent to the provider.
+  // This guards against mandatory wording alone forcing a paid repair for every small result.
+  const disclosures = [...unityDescriptionRules(false, rich).matchAll(/^\d\. "(.+)"$/gm)].map(match => match[1]);
+  assert.equal(disclosures.length, 4);
+  const opening = 'Choose your stake. Watch the center line.';
+  const start = (rich ? `<b><font color="#D32F2F">${opening}</font></b>` : opening) + '\n\n';
+  const end = '\n\nTerms and Conditions:\n' + disclosures.join('\n');
+  let body = 'A social casino. ';
+  for (let i = 0; start.length + body.length + end.length + 12 < 1490; i++) body += `detail${i} `;
+  body += 'x'.repeat(1490 - start.length - body.length - end.length);
+  const result = start + body + end;
+  assert.equal(result.length, 1490);
+  assert.deepEqual(analyzeText(result).spam, []);
+});
 
 async function fixture(t, outputs = [clean]) {
   const original = { callClaude: app.locals.callClaude, isAIConfigured: app.locals.isAIConfigured };
