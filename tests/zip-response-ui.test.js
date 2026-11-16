@@ -73,6 +73,39 @@ test('TikTok rich HTML selection enables preview and reaches generation and manu
     ['/api/aso', 'tiktok_aso_max_rich_html'], ['/api/fix-spam', 'tiktok_aso_max_rich_html']
   ]);
 });
+test('Unity rich HTML selection shows preview for empty and plain drafts', async () => {
+  const $ = await mount(() => assert.fail('Preview selection must not use AI'), { toneChoice: 'tiktok_aso_unity_rich_html' });
+  $('fullDesc').value = '';
+  $('toneChoice').onclick();
+  assert.equal($('descriptionPreviewPanel').hidden, false);
+  assert.equal($('unityOptions').hidden, false);
+  $('fullDesc').value = 'Explore virtual games.';
+  $('fullDesc').listeners.input();
+  assert.equal($('descriptionPreviewPanel').hidden, false);
+  assert.equal($('descriptionPreview').innerHTML, 'Explore virtual games.');
+});
+for (const [toneChoice, certifiedWhenChecked] of [
+  ['tiktok_aso_unity', true], ['tiktok_aso_unity_rich_html', true], ['normal', false]
+]) {
+  test(`${toneChoice} sends strict RNG certification to generation and manual repair`, async () => {
+    const requests = [];
+    const $ = await mount(async (url, options) => {
+      requests.push([url, JSON.parse(options.body).tone, JSON.parse(options.body).unityRngCertified]);
+      return new Response(JSON.stringify({ shortDescription: 'Demo: Explore.', fullDescription: 'Explore virtual games.',
+        spamCheck: { clean: true, remaining: [], frequency: [], maxAllowed: 1, totalWords: 3, densityLimit: 2.5 } }));
+    }, { toneChoice });
+    $('toneChoice').onclick();
+    assert.equal($('unityOptions').hidden, !certifiedWhenChecked);
+    for (const [checked, expected] of [[false, false], [true, certifiedWhenChecked], ['true', false]]) {
+      $('unityRngCertified').checked = checked;
+      await $('genBtn').onclick();
+      await $('fixSpamBtn').onclick();
+      assert.deepEqual(requests.splice(0), [
+        ['/api/aso', toneChoice, expected], ['/api/fix-spam', toneChoice, expected]
+      ]);
+    }
+  });
+}
 test('ZIP rich result previews safe formatting and copies both original HTML and visible text', async () => {
   const clipboard = [];
   const html = '<b><font color="red">Explore</font></b>\n<i>At your pace</i> <u>offline</u>';

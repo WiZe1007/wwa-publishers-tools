@@ -136,6 +136,7 @@ async function fitImage(file, w, h) {
 const fmtSize = b => b > 1048576 ? (b/1048576).toFixed(1)+' MB' : (b/1024).toFixed(0)+' KB';
 
 // ================= Tone selector =================
+const UNITY_TONES = ['tiktok_aso_unity', 'tiktok_aso_unity_rich_html'];
 let tone = 'normal';
 root.querySelectorAll('#tones .tone').forEach(t => {
   t.style.setProperty('--tc', t.dataset.color);
@@ -143,7 +144,7 @@ root.querySelectorAll('#tones .tone').forEach(t => {
     root.querySelectorAll('#tones .tone').forEach(x => x.classList.remove('sel'));
     t.classList.add('sel');
     tone = t.dataset.tone;
-    $('unityOptions').hidden = tone !== 'tiktok_aso_unity';
+    $('unityOptions').hidden = !UNITY_TONES.includes(tone);
     updFullCount();
   };
 });
@@ -168,7 +169,7 @@ function updFullCount() {
   const formatted = formatDescription($('fullDesc').value);
   $('fullCount').textContent = `(${len} символів${formatted.hasMarkup ? ' з HTML' : ''}, ціль ≤ ${max})`;
   $('fullCount').style.color = len > max ? 'var(--red)' : '';
-  $('descriptionPreviewPanel').hidden = !formatted.hasMarkup && !['aso_rich_html', 'tiktok_aso_max_rich_html'].includes(tone);
+  $('descriptionPreviewPanel').hidden = !formatted.hasMarkup && !['aso_rich_html', 'tiktok_aso_max_rich_html', 'tiktok_aso_unity_rich_html'].includes(tone);
   $('descriptionPreview').innerHTML = formatted.html;
   $('descriptionVisibleCount').textContent = `${Array.from(formatted.text).length} символів без тегів`;
   $('descriptionCopyStatus').textContent = '';
@@ -234,7 +235,7 @@ $('genBtn').onclick = async () => {
         description: desc,
         category: $('category').value.trim(),
         tone,
-        unityRngCertified: tone === 'tiktok_aso_unity' && $('unityRngCertified').checked === true,
+        unityRngCertified: UNITY_TONES.includes(tone) && $('unityRngCertified').checked === true,
         size: descSize,
         screenshots: thumbs
       })
@@ -317,7 +318,7 @@ $('fixSpamBtn').onclick = async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         text, appName: $('appName').value.trim(), tone,
-        unityRngCertified: tone === 'tiktok_aso_unity' && $('unityRngCertified').checked === true
+        unityRngCertified: UNITY_TONES.includes(tone) && $('unityRngCertified').checked === true
       })
     });
     if (typeof data.fullDescription !== 'string' || !data.fullDescription.trim() || !data.spamCheck)

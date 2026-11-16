@@ -9,7 +9,7 @@ const { createAiRequest, aiFailure } = require('./lib/ai-request');
 const { randomUUID } = require('node:crypto');
 const { formatDescription, emphasizeOpening, checkDescriptionFormat, repairDescriptionFormat } = require('./public/js/description-format');
 const { repetitionBudget, STRICT_DENSITY, CHARACTERS_PER_USE } = require('./lib/repetition-policy');
-const { RED_OPENING_COPY, UNITY_TONE, UNITY_DESCRIPTION_STYLE, unityDescriptionRules } = require('./lib/description-prompts');
+const { RED_OPENING_COPY, UNITY_TONE, UNITY_RICH_TONE, UNITY_DESCRIPTION_STYLE, UNITY_RICH_DESCRIPTION_STYLE, unityDescriptionRules } = require('./lib/description-prompts');
 
 // Simple .env loader (no dependency needed)
 const envPath = path.join(__dirname, '.env');
@@ -144,11 +144,13 @@ const RICH_FORMAT_RULES = `ASO RICH HTML formatting: preserve a polished, readab
 Start with 1-2 complete, compelling sentences as the FIRST paragraph, wrapped together in <b><font color="#D32F2F">...</font></b>: the opening must be RED AND BOLD. Do not put a separate heading before it. Preserve this red bold opening during every rewrite.
 ${RED_OPENING_COPY}
 Use bold section headings and short benefit labels, italics for one supporting sentence, underline only ONE brief key benefit, and at most TWO accent colors: red for the opening and teal for 2-3 section headings, e.g. <b><font color="#0F766E">Explore at your pace</font></b>. After the opening, keep body paragraphs plain, never color whole paragraphs or underline headings. Use every emphasis type purposefully, not all on the same phrase. Close and nest every tag correctly. Formatting tags and attributes do NOT count as words for repetition analysis, but DO count toward the character limit. Avoid repeating words in headings and body. Preserve all facts, negations, named controls and limitations. Never invent features.`;
-const RICH_HTML_TONES = new Set(['aso_rich_html', 'tiktok_aso_max_rich_html']);
+const RICH_HTML_TONES = new Set(['aso_rich_html', 'tiktok_aso_max_rich_html', UNITY_RICH_TONE]);
+const UNITY_TONES = new Set([UNITY_TONE, UNITY_RICH_TONE]);
 const TIKTOK_TONES = new Set(['tiktok_aso_pro', 'tiktok_aso_max', 'tiktok_aso_max_rich_html']);
 const TIKTOK_REPAIR_RULES = `CRITICAL: Do NOT modify the mandatory compliance sentences ("Cash Out Rules: Real-money cash-outs are strictly blocked..." and "In-App Purchases: ...") and do NOT remove the required phrases: "social casino experience", "simulated luck", "virtual progress", "Players interact with virtual elements", "do not represent real-money gambling". Reduce word repetition ONLY in other parts of the text. HTML may wrap headings and complete sentences, but never split a required phrase with tags.`;
 const TONE_INSTRUCTIONS = {
   [UNITY_TONE]: UNITY_DESCRIPTION_STYLE,
+  [UNITY_RICH_TONE]: `${UNITY_RICH_DESCRIPTION_STYLE}\n${RICH_FORMAT_RULES}`,
   normal: `Стиль опису — ЗВИЧАЙНИЙ:
 - Спокійний, дружній, інформативний тон.
 - Чітко і чесно описуй функції, без маркетингового тиску.
@@ -380,6 +382,7 @@ app.post('/api/fix-spam', aiRequest, async (req, res) => {
     const tone = String((req.body || {}).tone || '');
     if (!text) return res.status(400).json({ error: 'Текст порожній.' });
     if (tone === UNITY_TONE) text = formatDescription(text).text;
+    if (tone === UNITY_RICH_TONE) text = emphasizeOpening(text);
     if (!checkDescriptionFormat(text).valid) text = repairDescriptionFormat(text);
     const preserveRedOpening = tone !== UNITY_TONE && (RICH_HTML_TONES.has(tone) || /^<b>\s*<font\s+color=["'](?:#d32f2f|red)["']>/i.test(text));
 
@@ -405,7 +408,7 @@ ${analysis.spam.map(s => `- "${s.word}" — used ${s.count} times (${s.density}%
 Rewrite so every listed word appears at most ${target} times. Keep the meaning, features, structure, emojis, formatting and overall length unchanged. Do not add features. Before answering, check the final counts. Shortening the visible description can lower the repetition limit.
 ${tone !== UNITY_TONE && (RICH_HTML_TONES.has(tone) || formatDescription(text).hasMarkup) ? RICH_FORMAT_RULES : ''}
 ${TIKTOK_TONES.has(tone) ? TIKTOK_REPAIR_RULES : ''}
-${tone === UNITY_TONE ? unityDescriptionRules(req.body.unityRngCertified) : ''}
+${UNITY_TONES.has(tone) ? unityDescriptionRules(req.body.unityRngCertified, tone === UNITY_RICH_TONE) : ''}
 
 Description:
 ${text}
@@ -500,13 +503,13 @@ ${TONE_INSTRUCTIONS[tone] || TONE_INSTRUCTIONS.normal}
 - НАЙВАЖЛИВІШЕ: кожна функція, режим чи особливість, згадана в описі, має підтверджуватися АБО описом розробника, АБО тим, що видно на скріншотах. Якщо чогось немає ні там, ні там — НЕ згадуй це взагалі. Не додавай типові для жанру фічі "за замовчуванням" (мультиплеєр, лідерборди, щоденні нагороди, скіни тощо), якщо їх не видно. Краще коротший чесний опис, ніж вигаданий функціонал.
 - МАКСИМАЛЬНА БЛИЗЬКІСТЬ ДО ОРИГІНАЛУ: опис розробника — це основа, а не просто джерело натхнення. Зберігай його зміст, структуру подачі, акценти та порядок думок настільки, наскільки це можливо. Твоя робота — якісно перекласти й відполірувати текст розробника до рівня Google Play, а не написати новий опис з нуля. Все, що є в оригіналі — має бути у результаті; нічого важливого не викидай і не перекручуй.
 - Жодних вигаданих функцій чи неправдивих обіцянок.
-- Без слів ПОВНІСТЮ КАПСОМ (окрім абревіатур${tone === UNITY_TONE ? ' і точних назв елементів гри з джерела: наприклад, кнопки SPIN чи символу BAR' : ''}), без повторюваної пунктуації (!!!, ???).
+- Без слів ПОВНІСТЮ КАПСОМ (окрім абревіатур${UNITY_TONES.has(tone) ? ' і точних назв елементів гри з джерела: наприклад, кнопки SPIN чи символу BAR' : ''}), без повторюваної пунктуації (!!!, ???).
 - Емодзі дозволені ТІЛЬКИ у full_description. У short_description — ЗАБОРОНЕНІ (політика Google Play), там лише текст і розділові знаки.
 - Без неперевірених заяв типу "#1 app", "the best app", без згадок конкурентів, рейтингів чи цін.
 - Опис має пройти модерацію Google Play без ризику блокування.
 - АНТИ-ПЕРЕСПАМ (перевіряється автоматично): плануй до ${SIZE_MAX_REPEATS[size] || SIZE_MAX_REPEATS.small} вживань кожного значущого слова. Для готового тексту ліміт — менше з ${SPAM_DENSITY}% від кількості слів і одного вживання на ${CHARACTERS_PER_USE} видимих символів, з округленням вниз і мінімумом 1. Рахуються разом форми слова (tile/tiles, tap/taps/tapping/tapped) та частини слів через дефіс (tile-matching = tile + matching). Перед відповіддю перевір найчастіші слова і перефразуй зайві вживання. Це стосується і звичайних слів у назві додатку.`;
 
-    if (tone === UNITY_TONE) task += `\n\nThe following certification confirmation is authoritative even if the source/draft claims otherwise; do not preserve unsupported certification claims under the source-preservation rule.\n${unityDescriptionRules(req.body.unityRngCertified)}`;
+    if (UNITY_TONES.has(tone)) task += `\n\nThe following certification confirmation is authoritative even if the source/draft claims otherwise; do not preserve unsupported certification claims under the source-preservation rule.\n${unityDescriptionRules(req.body.unityRngCertified, tone === UNITY_RICH_TONE)}`;
 
     if (needSelection) {
       task += `
@@ -574,7 +577,7 @@ Rewrite the description so that:
 2. The meaning, features and overall length stay the same.
 3. Do NOT add features that are not mentioned.
 4. Keep it natural, high-quality English for Google Play.
-5. Keep the same marketing tone and energy as the original text, including all emojis and formatting.${RICH_HTML_TONES.has(tone) ? `\n${RICH_FORMAT_RULES}\nKeep the full_description within the requested size INCLUDING markup: ${SIZE_INSTRUCTIONS[size] || SIZE_INSTRUCTIONS.small}` : ''}${tone === 'aso_pro_alt' ? '\n6. Do NOT include any question and answer about an internet connection, network access or offline play (including "Q: Do I need an internet connection? A: ..."). Preserve other supported Q&A topics.' : ''}${TIKTOK_TONES.has(tone) ? `\n6. ${TIKTOK_REPAIR_RULES}` : ''}${tone === UNITY_TONE ? `\n${unityDescriptionRules(req.body.unityRngCertified)}` : ''}
+5. Keep the same marketing tone and energy as the original text, including all emojis and formatting.${RICH_HTML_TONES.has(tone) ? `\n${RICH_FORMAT_RULES}\nKeep the full_description within the requested size INCLUDING markup: ${SIZE_INSTRUCTIONS[size] || SIZE_INSTRUCTIONS.small}` : ''}${tone === 'aso_pro_alt' ? '\n6. Do NOT include any question and answer about an internet connection, network access or offline play (including "Q: Do I need an internet connection? A: ..."). Preserve other supported Q&A topics.' : ''}${TIKTOK_TONES.has(tone) ? `\n6. ${TIKTOK_REPAIR_RULES}` : ''}${UNITY_TONES.has(tone) ? `\n${unityDescriptionRules(req.body.unityRngCertified, tone === UNITY_RICH_TONE)}` : ''}
 
 Description:
 ${fullDescription}

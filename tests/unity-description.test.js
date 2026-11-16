@@ -36,13 +36,45 @@ test('Unity generation selects its own Terms template without the older TikTok t
   assert.equal(data.fullDescription, clean);
 });
 
-for (const confirmed of [true, false, undefined, 'true', 1]) {
-  test(`RNG certification requires an explicit boolean confirmation (${String(confirmed)})`, async t => {
+for (const tone of ['tiktok_aso_unity', 'tiktok_aso_unity_rich_html']) for (const confirmed of [true, false, undefined, 'true', 1]) {
+  test(`${tone} RNG certification requires an explicit boolean confirmation (${String(confirmed)})`, async t => {
     const { post, prompts } = await fixture(t);
-    const { status } = await post('/api/aso', { ...payload, unityRngCertified: confirmed });
+    const { status } = await post('/api/aso', { ...payload, tone, unityRngCertified: confirmed });
     assert.equal(status, 200);
     assert.match(prompts[0], confirmed === true ? /RNG certification: CONFIRMED/ : /RNG certification: NOT CONFIRMED/);
     assert.equal(prompts.length, 1);
+  });
+}
+
+const richTone = 'tiktok_aso_unity_rich_html';
+const richBody = `\n\n<b><font color="#0F766E">Features</font></b>\n<i>Explore your options.</i> <u>Saved progress.</u>\n${clean}\n\n<b>Terms and Conditions</b>\nFor users aged 18 and above. For entertainment purposes only.\nAll coins, credits and rewards are virtual, have no real-world monetary value, and cannot be withdrawn, exchanged for cash or redeemed for prizes of real-world value.\nSuccess in social casino games does not guarantee future success in real-money gambling.`;
+const redIntro = '<b><font color="#D32F2F">Match the middle line. Choose your stake.</font></b>';
+
+test('Unity Rich generation formats just two opening sentences and preserves the disclosure and body emphasis', async t => {
+  const { post, prompts } = await fixture(t, ['Match the middle line. Choose your stake. Keep playing.' + richBody]);
+  const { status, data } = await post('/api/aso', { ...payload, tone: richTone });
+  assert.equal(status, 200);
+  assert.equal(data.fullDescription, redIntro + ' Keep playing.' + richBody);
+  assert.equal(prompts.length, 1);
+  assert.match(prompts[0], /Terms and Conditions/);
+  assert.match(prompts[0], /ASO RICH HTML/);
+  assert.doesNotMatch(prompts[0], /plain text only, no HTML|Return plain text only: no HTML/);
+});
+
+for (const confirmed of [true, false]) for (const route of ['/api/aso', '/api/fix-spam']) {
+  test(`Unity Rich ${route} repair keeps formatting and the certification policy (${confirmed})`, async t => {
+    const fixed = 'Match the middle line. Choose your stake.' + richBody;
+    const { post, prompts } = await fixture(t, route === '/api/aso' ? [repeated + richBody, fixed] : [fixed]);
+    const { status, data } = await post(route, { ...payload, text: repeated + richBody, tone: richTone, unityRngCertified: confirmed });
+    assert.equal(status, 200);
+    assert.equal(data.fullDescription, redIntro + richBody);
+    assert.equal(data.spamCheck.clean, true);
+    assert.equal(prompts.length, route === '/api/aso' ? 2 : 1);
+    const repairPrompt = prompts.at(-1);
+    assert.match(repairPrompt, /ASO RICH HTML/);
+    assert.match(repairPrompt, /Success in social casino games does not guarantee future success in real-money gambling/);
+    assert.match(repairPrompt, confirmed ? /RNG certification: CONFIRMED/ : /RNG certification: NOT CONFIRMED/);
+    assert.doesNotMatch(repairPrompt, /Return plain text only: no HTML|Real-money cash-outs are strictly blocked/);
   });
 }
 
