@@ -53,7 +53,7 @@ test('Unity generation selects its own Terms template without the older TikTok t
   assert.equal(data.fullDescription, clean);
 });
 
-for (const tone of ['tiktok_aso_unity', 'tiktok_aso_unity_rich_html']) for (const confirmed of [true, false, undefined, 'true', 1]) {
+for (const tone of ['tiktok_aso_unity', 'tiktok_aso_unity_rich_html', 'aso_pro_alt_unity']) for (const confirmed of [true, false, undefined, 'true', 1]) {
   test(`${tone} RNG certification requires an explicit boolean confirmation (${String(confirmed)})`, async t => {
     const { post, prompts } = await fixture(t);
     const { status } = await post('/api/aso', { ...payload, tone, unityRngCertified: confirmed });
@@ -62,6 +62,49 @@ for (const tone of ['tiktok_aso_unity', 'tiktok_aso_unity_rich_html']) for (cons
     assert.equal(prompts.length, 1);
   });
 }
+
+const alternativeTone = 'aso_pro_alt_unity';
+test('Alternative Unity generation combines its narrative presentation with Unity disclosures', async t => {
+  const { post, prompts } = await fixture(t, [`<b>${clean}</b>`]);
+  const { status, data } = await post('/api/aso', { ...payload, tone: alternativeTone });
+  assert.equal(status, 200);
+  assert.match(prompts[0], /ASO PRO ALTERNATIVE PRESENTATION/);
+  assert.match(prompts[0], /Terms and Conditions/);
+  assert.match(prompts[0], /Q&A/);
+  assert.doesNotMatch(prompts[0], /Жодних тем удачі\/казино\/азарту|ASO RICH HTML/);
+  assert.equal(data.fullDescription, clean);
+  assert.equal(prompts.length, 1);
+});
+
+for (const route of ['/api/aso', '/api/fix-spam']) test(`Alternative Unity ${route} repair retains narrative and FAQ restrictions`, async t => {
+  const { post, prompts } = await fixture(t, route === '/api/aso' ? [repeated, `<i>${clean}</i>`] : [`<i>${clean}</i>`]);
+  const { status, data } = await post(route, { ...payload, text: `<b>${repeated}</b>`, tone: alternativeTone, unityRngCertified: false });
+  assert.equal(status, 200);
+  assert.equal(prompts.length, route === '/api/aso' ? 2 : 1);
+  assert.equal(data.fullDescription, clean);
+  assert.equal(data.spamCheck.clean, true);
+  assert.match(prompts.at(-1), /ASO PRO ALTERNATIVE PRESENTATION/);
+  assert.match(prompts.at(-1), /internet connection, network access or offline play/);
+  assert.match(prompts.at(-1), /Terms and Conditions/);
+  assert.match(prompts.at(-1), /RNG certification: NOT CONFIRMED/);
+  assert.doesNotMatch(prompts.at(-1), /ASO RICH HTML|Real-money cash-outs are strictly blocked/);
+});
+
+test('Alternative Unity removes rich formatting for free when no repetition repair is needed', async t => {
+  const { post, prompts } = await fixture(t);
+  const { status, data } = await post('/api/fix-spam', { tone: alternativeTone, text: `<b><font color="#D32F2F">${clean}</font></b>` });
+  assert.equal(status, 200);
+  assert.equal(data.fullDescription, clean);
+  assert.equal(prompts.length, 0);
+});
+
+test('original ASO Pro Alternative does not receive Unity disclosures or RNG confirmation', async t => {
+  const { post, prompts } = await fixture(t);
+  const { status } = await post('/api/aso', { ...payload, tone: 'aso_pro_alt', unityRngCertified: true });
+  assert.equal(status, 200);
+  assert.match(prompts[0], /ASO PRO ALTERNATIVE/);
+  assert.doesNotMatch(prompts[0], /UNITY DISCLOSURES|RNG certification:|Terms and Conditions/);
+});
 
 const richTone = 'tiktok_aso_unity_rich_html';
 const richBody = `\n\n<b><font color="#0F766E">Features</font></b>\n<i>Explore your options.</i> <u>Saved progress.</u>\n${clean}\n\n<b>Terms and Conditions</b>\nFor users aged 18 and above. For entertainment purposes only.\nAll coins, credits and rewards are virtual, have no real-world monetary value, and cannot be withdrawn, exchanged for cash or redeemed for prizes of real-world value.\nSuccess in social casino games does not guarantee future success in real-money gambling.`;

@@ -84,8 +84,19 @@ test('Unity rich HTML selection shows preview for empty and plain drafts', async
   assert.equal($('descriptionPreviewPanel').hidden, false);
   assert.equal($('descriptionPreview').innerHTML, 'Explore virtual games.');
 });
+test('Alternative Unity selection offers RNG options and keeps empty and plain drafts as plain text', async () => {
+  const $ = await mount(() => assert.fail('Style selection must not use AI'), { toneChoice: 'aso_pro_alt_unity' });
+  $('fullDesc').value = '';
+  $('toneChoice').onclick();
+  assert.equal($('unityOptions').hidden, false);
+  assert.equal($('descriptionPreviewPanel').hidden, true);
+  $('fullDesc').value = 'Explore virtual games.';
+  $('fullDesc').listeners.input();
+  assert.equal($('descriptionPreviewPanel').hidden, true);
+});
 for (const [toneChoice, certifiedWhenChecked] of [
-  ['tiktok_aso_unity', true], ['tiktok_aso_unity_rich_html', true], ['normal', false]
+  ['tiktok_aso_unity', true], ['tiktok_aso_unity_rich_html', true], ['aso_pro_alt_unity', true],
+  ['aso_pro_alt', false], ['normal', false]
 ]) {
   test(`${toneChoice} sends strict RNG certification to generation and manual repair`, async () => {
     const requests = [];

@@ -136,7 +136,7 @@ async function fitImage(file, w, h) {
 const fmtSize = b => b > 1048576 ? (b/1048576).toFixed(1)+' MB' : (b/1024).toFixed(0)+' KB';
 
 // ================= Tone selector =================
-const UNITY_TONES = ['tiktok_aso_unity', 'tiktok_aso_unity_rich_html'];
+const UNITY_TONES = ['tiktok_aso_unity', 'tiktok_aso_unity_rich_html', 'aso_pro_alt_unity'];
 let tone = 'normal';
 root.querySelectorAll('#tones .tone').forEach(t => {
   t.style.setProperty('--tc', t.dataset.color);
