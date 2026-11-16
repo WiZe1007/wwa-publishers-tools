@@ -121,13 +121,13 @@ test('Alternative Unity generation combines its narrative presentation with Unit
   assert.equal(status, 200);
   assert.match(prompts[0], /ASO PRO ALTERNATIVE PRESENTATION/);
   assert.match(prompts[0], /Terms and Conditions/);
-  assert.match(prompts[0], /Q&A/);
+  assert.match(prompts[0], /ALTERNATIVE PROSE ONLY/);
   assert.doesNotMatch(prompts[0], /Жодних тем удачі\/казино\/азарту|ASO RICH HTML/);
   assert.equal(data.fullDescription, clean);
   assert.equal(prompts.length, 1);
 });
 
-for (const route of ['/api/aso', '/api/fix-spam']) test(`Alternative Unity ${route} repair retains narrative and FAQ restrictions`, async t => {
+for (const route of ['/api/aso', '/api/fix-spam']) test(`Alternative Unity ${route} repair retains narrative without Q&A`, async t => {
   const { post, prompts } = await fixture(t, route === '/api/aso' ? [repeated, `<i>${clean}</i>`] : [`<i>${clean}</i>`]);
   const { status, data } = await post(route, { ...payload, text: `<b>${repeated}</b>`, tone: alternativeTone, unityRngCertified: false });
   assert.equal(status, 200);
@@ -135,10 +135,41 @@ for (const route of ['/api/aso', '/api/fix-spam']) test(`Alternative Unity ${rou
   assert.equal(data.fullDescription, clean);
   assert.equal(data.spamCheck.clean, true);
   assert.match(prompts.at(-1), /ASO PRO ALTERNATIVE PRESENTATION/);
-  assert.match(prompts.at(-1), /internet connection, network access or offline play/);
+  assert.match(prompts.at(-1), /Do not include or retain a Q&A, FAQ/);
   assert.match(prompts.at(-1), /Terms and Conditions/);
   assert.match(prompts.at(-1), /RNG certification: NOT CONFIRMED/);
   assert.doesNotMatch(prompts.at(-1), /ASO RICH HTML|Real-money cash-outs are strictly blocked/);
+});
+
+for (const tone of ['aso_pro_alt', 'aso_pro_alt_unity']) {
+  for (const operation of ['generate', 'automatic repair', 'manual repair']) {
+    test(`${tone} ${operation} converts earlier Q&A into thematic prose`, async t => {
+      const { post, prompts } = await fixture(t, operation === 'automatic repair' ? [repeated, clean] : [clean]);
+      const route = operation === 'manual repair' ? '/api/fix-spam' : '/api/aso';
+      const { status } = await post(route, { ...payload, tone,
+        description: 'Q: How long is a round?\nA: About two minutes.\nQ: Who is it for?\nA: Casual players.',
+        text: repeated + '\nQ: How long is a round?\nA: About two minutes.' });
+      assert.equal(status, 200);
+      assert.equal(prompts.length, operation === 'automatic repair' ? 2 : 1);
+      for (const prompt of prompts) {
+        assert.match(prompt, /Do not include or retain a Q&A, FAQ/);
+        assert.match(prompt, /Rewrite supported answers as ordinary prose/);
+        assert.match(prompt, /Preserve sourced facts, numbers, limitations and required disclosures/);
+        assert.doesNotMatch(prompt, /add a compact Q&A|міні-блок питань і відповідей|Preserve other supported Q&A|same narrative sections and supported Q&A/);
+      }
+      if (tone === 'aso_pro_alt_unity') assert.match(prompts.at(-1), /Terms and Conditions/);
+    });
+  }
+}
+
+test('Alternative Q&A policy does not change another style', async t => {
+  const { post, prompts } = await fixture(t);
+  for (const route of ['/api/aso', '/api/fix-spam']) {
+    const { status } = await post(route, { ...payload, tone: 'normal', text: repeated });
+    assert.equal(status, 200);
+  }
+  assert.equal(prompts.length, 2);
+  assert.ok(prompts.every(prompt => !prompt.includes('ALTERNATIVE PROSE ONLY')));
 });
 
 test('Alternative Unity removes rich formatting for free when no repetition repair is needed', async t => {

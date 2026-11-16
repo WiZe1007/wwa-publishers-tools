@@ -9,7 +9,7 @@ const { createAiRequest, aiFailure } = require('./lib/ai-request');
 const { randomUUID } = require('node:crypto');
 const { formatDescription, emphasizeOpening, checkDescriptionFormat, repairDescriptionFormat } = require('./public/js/description-format');
 const { repetitionBudget, STRICT_DENSITY, CHARACTERS_PER_USE } = require('./lib/repetition-policy');
-const { RED_OPENING_COPY, UNITY_TONE, UNITY_RICH_TONE, UNITY_ALT_TONE,
+const { RED_OPENING_COPY, ALTERNATIVE_PROSE_RULES, UNITY_TONE, UNITY_RICH_TONE, UNITY_ALT_TONE,
   UNITY_DESCRIPTION_STYLE, UNITY_RICH_DESCRIPTION_STYLE, UNITY_ALT_DESCRIPTION_STYLE, resolveUnityRngMode, unityDescriptionRules } = require('./lib/description-prompts');
 
 // Simple .env loader (no dependency needed)
@@ -204,11 +204,13 @@ SEO-БАЗА (незмінна): визнач 3–5 цільових ключо�
 2. Далі текст ділиться на 3–4 ТЕМАТИЧНІ СЕКЦІЇ з власними заголовками (пиши заголовки як короткі фрази з великої літери, наприклад "Inside the game", "What makes it different", "Built for short sessions"). Заголовки формулюй під конкретний додаток, не шаблонні.
 3. Кожна секція — суцільний абзац на 2–4 речення (НЕ буліт-списки!). Функції описуй у зв'язному тексті, а не переліком.
 4. Максимум ОДИН короткий список на весь опис — і лише якщо без нього ніяк; тоді це має бути перелік у 3–4 рядки в кінці однієї з секцій.
-5. Наприкінці — міні-блок питань і відповідей у 2–3 пункти (формат "Q: ... A: ..." або "Питання одним рядком, відповідь наступним"), який закриває практичні моменти: скільки триває сесія, для кого гра, чи є покупки — але тільки те, що підтверджується описом розробника чи скріншотами. НЕ додавай питання та відповіді про необхідність інтернету, підключення до мережі або офлайн-режим жодною мовою (зокрема "Q: Do I need an internet connection? A: ...").
+5. Практичні відомості про тривалість сесії, аудиторію чи покупки вплітай у відповідні тематичні абзаци — лише коли це підтверджує опис розробника або скріншоти.
 6. Фінал: одне спокійне речення-запрошення без слова "Download" на початку — тут доречно згадати назву додатку ще раз (якщо ліміт 3 не вичерпано).
 7. У кінці — короткий рядок з природними ключовими словами та синонімами (без стаффінгу), оформлений як звичайне речення, а не як перелік через кому.
 
-УТОЧНЕННЯ ПРО ГРОШІ (обов'язково): опис має чітко давати зрозуміти, що це НЕ гра на реальні гроші — всі бали/монети/винагороди віртуальні, не мають реальної грошової цінності, вивід реальних грошей неможливий. Вплети це органічно у відповідну секцію або в Q&A. Жодних тем удачі/казино/азарту.
+УТОЧНЕННЯ ПРО ГРОШІ (обов'язково): опис має чітко давати зрозуміти, що це НЕ гра на реальні гроші — всі бали/монети/винагороди віртуальні, не мають реальної грошової цінності, вивід реальних грошей неможливий. Вплети це органічно у відповідний тематичний абзац. Жодних тем удачі/казино/азарту.
+
+${ALTERNATIVE_PROSE_RULES}
 
 ЕМОДЗІ: мінімально — максимум 2–3 на весь опис, лише поруч із заголовками секцій (не в кожному). НЕ використовуй емодзі як марери списків.
 ТОН: спокійний, оповідний, "редакційний" — інша інтонація, ніж у стандартному ASO Pro. Весь фактичний зміст — виключно з опису розробника та скріншотів.`,
@@ -412,6 +414,7 @@ ${analysis.spam.map(s => `- "${s.word}" — used ${s.count} times (${s.density}%
 Rewrite so every listed word appears at most ${target} times. Keep the meaning, features, structure, emojis, formatting and overall length unchanged. Do not add features. Before answering, check the final counts. Shortening the visible description can lower the repetition limit.
 ${!UNITY_PLAIN_TONES.has(tone) && (RICH_HTML_TONES.has(tone) || formatDescription(text).hasMarkup) ? RICH_FORMAT_RULES : ''}
 ${TIKTOK_TONES.has(tone) ? TIKTOK_REPAIR_RULES : ''}
+${tone === 'aso_pro_alt' ? ALTERNATIVE_PROSE_RULES : ''}
 ${UNITY_TONES.has(tone) ? unityDescriptionRules(unityRngMode, tone === UNITY_RICH_TONE, tone === UNITY_ALT_TONE) : ''}
 
 Description:
@@ -584,7 +587,7 @@ Rewrite the description so that:
 2. The meaning, features and overall length stay the same.
 3. Do NOT add features that are not mentioned.
 4. Keep it natural, high-quality English for Google Play.
-5. Keep the same marketing tone and energy as the original text, including all emojis and formatting.${RICH_HTML_TONES.has(tone) ? `\n${RICH_FORMAT_RULES}\nKeep the full_description within the requested size INCLUDING markup: ${SIZE_INSTRUCTIONS[size] || SIZE_INSTRUCTIONS.small}` : ''}${tone === 'aso_pro_alt' ? '\n6. Do NOT include any question and answer about an internet connection, network access or offline play (including "Q: Do I need an internet connection? A: ..."). Preserve other supported Q&A topics.' : ''}${TIKTOK_TONES.has(tone) ? `\n6. ${TIKTOK_REPAIR_RULES}` : ''}${UNITY_TONES.has(tone) ? `\n${unityDescriptionRules(unityRngMode, tone === UNITY_RICH_TONE, tone === UNITY_ALT_TONE)}` : ''}
+5. Keep the same marketing tone and energy as the original text, including all emojis and formatting.${RICH_HTML_TONES.has(tone) ? `\n${RICH_FORMAT_RULES}\nKeep the full_description within the requested size INCLUDING markup: ${SIZE_INSTRUCTIONS[size] || SIZE_INSTRUCTIONS.small}` : ''}${tone === 'aso_pro_alt' ? `\n${ALTERNATIVE_PROSE_RULES}` : ''}${TIKTOK_TONES.has(tone) ? `\n6. ${TIKTOK_REPAIR_RULES}` : ''}${UNITY_TONES.has(tone) ? `\n${unityDescriptionRules(unityRngMode, tone === UNITY_RICH_TONE, tone === UNITY_ALT_TONE)}` : ''}
 
 Description:
 ${fullDescription}
