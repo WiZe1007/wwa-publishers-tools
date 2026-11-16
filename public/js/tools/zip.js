@@ -143,6 +143,7 @@ root.querySelectorAll('#tones .tone').forEach(t => {
     root.querySelectorAll('#tones .tone').forEach(x => x.classList.remove('sel'));
     t.classList.add('sel');
     tone = t.dataset.tone;
+    $('unityOptions').hidden = tone !== 'tiktok_aso_unity';
     updFullCount();
   };
 });
@@ -233,6 +234,7 @@ $('genBtn').onclick = async () => {
         description: desc,
         category: $('category').value.trim(),
         tone,
+        unityRngCertified: tone === 'tiktok_aso_unity' && $('unityRngCertified').checked === true,
         size: descSize,
         screenshots: thumbs
       })
@@ -313,7 +315,10 @@ $('fixSpamBtn').onclick = async () => {
     const data = await requestJson('/api/fix-spam', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, appName: $('appName').value.trim(), tone })
+      body: JSON.stringify({
+        text, appName: $('appName').value.trim(), tone,
+        unityRngCertified: tone === 'tiktok_aso_unity' && $('unityRngCertified').checked === true
+      })
     });
     if (typeof data.fullDescription !== 'string' || !data.fullDescription.trim() || !data.spamCheck)
       throw new Error('AI повернув неповний опис. Ваш поточний текст не змінено.');
