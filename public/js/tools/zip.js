@@ -138,6 +138,9 @@ const fmtSize = b => b > 1048576 ? (b/1048576).toFixed(1)+' MB' : (b/1024).toFix
 // ================= Tone selector =================
 const UNITY_TONES = ['tiktok_aso_unity', 'tiktok_aso_unity_rich_html', 'aso_pro_alt_unity'];
 let tone = 'normal';
+const unityRngMode = () => UNITY_TONES.includes(tone)
+  ? root.querySelector('input[name="unityRngMode"]:checked')?.value || 'chance'
+  : undefined;
 root.querySelectorAll('#tones .tone').forEach(t => {
   t.style.setProperty('--tc', t.dataset.color);
   t.onclick = () => {
@@ -235,7 +238,7 @@ $('genBtn').onclick = async () => {
         description: desc,
         category: $('category').value.trim(),
         tone,
-        unityRngCertified: UNITY_TONES.includes(tone) && $('unityRngCertified').checked === true,
+        unityRngMode: unityRngMode(),
         size: descSize,
         screenshots: thumbs
       })
@@ -318,7 +321,7 @@ $('fixSpamBtn').onclick = async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         text, appName: $('appName').value.trim(), tone,
-        unityRngCertified: UNITY_TONES.includes(tone) && $('unityRngCertified').checked === true
+        unityRngMode: unityRngMode()
       })
     });
     if (typeof data.fullDescription !== 'string' || !data.fullDescription.trim() || !data.spamCheck)

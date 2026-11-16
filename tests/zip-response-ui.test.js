@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 
-async function mount(fetch, { health = '{"ok":true,"aiConfigured":true}', clipboard = [], toneChoice } = {}) {
+async function mount(fetch, { health = '{"ok":true,"aiConfigured":true}', clipboard = [], toneChoice, toneChoices = toneChoice ? [toneChoice] : [] } = {}) {
   const elements = new Map();
   function element() {
     return { value: '', textContent: '', innerHTML: '', disabled: false, style: { setProperty() {} },
@@ -12,6 +12,19 @@ async function mount(fetch, { health = '{"ok":true,"aiConfigured":true}', clipbo
       querySelector() { return element(); }, appendChild(child) { this.children.push(child); } };
   }
   const $ = id => { if (!elements.has(id)) elements.set(id, element()); return elements.get(id); };
+  const rngInputs = [];
+  for (const [tag] of fs.readFileSync('public/zip.html', 'utf8').matchAll(/<input\b[^>]*>/g)) {
+    const attrs = Object.fromEntries([...tag.matchAll(/([\w-]+)="([^"]*)"/g)].map(([, name, value]) => [name, value]));
+    if (attrs.type !== 'radio' || attrs.name !== 'unityRngMode') continue;
+    const input = $(attrs.id);
+    input.value = attrs.value;
+    let checked = /\schecked(?:\s|>)/.test(tag);
+    Object.defineProperty(input, 'checked', { get: () => checked, set: value => {
+      if (value) for (const sibling of rngInputs) if (sibling !== input) sibling.checked = false;
+      checked = Boolean(value);
+    } });
+    rngInputs.push(input);
+  }
   const context = vm.createContext({ console, fetch: (url, options) => url === '/api/health'
     ? Promise.resolve(new Response(health)) : fetch(url, options), AbortController, setTimeout, clearTimeout, TypeError,
     CSS: { escape: value => value },
@@ -31,9 +44,15 @@ async function mount(fetch, { health = '{"ok":true,"aiConfigured":true}', clipbo
   await descriptionFormat.link(() => {});
   const module = new vm.SourceTextModule(fs.readFileSync('public/js/tools/zip.js', 'utf8'), { context });
   await module.link(specifier => specifier === '../http.js' ? http : specifier === '../description-format.js' ? descriptionFormat : metadata); await module.evaluate();
-  if (toneChoice) $('toneChoice').dataset.tone = toneChoice;
-  module.namespace.mount({ querySelector: selector => $(selector.slice(1)),
-    querySelectorAll: selector => toneChoice && selector === '#tones .tone' ? [$('toneChoice')] : [] });
+  const tones = toneChoices.map(choice => {
+    const control = $('tone_' + choice);
+    control.dataset.tone = choice;
+    if (choice === toneChoice) elements.set('toneChoice', control);
+    return control;
+  });
+  module.namespace.mount({ querySelector: selector => selector === 'input[name="unityRngMode"]:checked'
+    ? rngInputs.find(input => input.checked) || null : $(selector.slice(1)),
+    querySelectorAll: selector => selector === '#tones .tone' ? tones : [] });
   $('appName').value = 'Demo'; $('devDescription').value = 'A private offline garden guide.';
   $('shortDesc').value = 'Previous short.'; $('fullDesc').value = 'Previous full description.';
   $('shotsInput').files = [{ name: 'test.jpg', type: 'image/jpeg' }]; $('shotsInput').onchange();
@@ -94,29 +113,76 @@ test('Alternative Unity selection offers RNG options and keeps empty and plain d
   $('fullDesc').listeners.input();
   assert.equal($('descriptionPreviewPanel').hidden, true);
 });
-for (const [toneChoice, certifiedWhenChecked] of [
-  ['tiktok_aso_unity', true], ['tiktok_aso_unity_rich_html', true], ['aso_pro_alt_unity', true],
-  ['aso_pro_alt', false], ['normal', false]
-]) {
-  test(`${toneChoice} sends strict RNG certification to generation and manual repair`, async () => {
+for (const toneChoice of ['tiktok_aso_unity', 'tiktok_aso_unity_rich_html', 'aso_pro_alt_unity']) {
+  for (const [inputId, expected] of [[null, 'chance'], ['unityRngOmit', 'omit'], ['unityRngChance', 'chance'], ['unityRngCertified', 'certified']]) {
+    test(`${toneChoice} sends ${inputId ? expected : 'default chance'} to generation and manual repair`, async () => {
+      const requests = [];
+      const $ = await mount(async (url, options) => {
+        requests.push({ url, body: JSON.parse(options.body) });
+        return new Response(JSON.stringify({ shortDescription: 'Demo: Explore.', fullDescription: 'Explore virtual games.',
+          spamCheck: { clean: true, remaining: [], frequency: [], maxAllowed: 1, totalWords: 3, densityLimit: 2.5 } }));
+      }, { toneChoice });
+      $('toneChoice').onclick();
+      assert.equal($('unityOptions').hidden, false);
+      if (inputId) $(inputId).checked = true;
+      await $('genBtn').onclick();
+      await $('fixSpamBtn').onclick();
+      assert.deepEqual(requests.map(({ url, body }) => [url, body.tone, body.unityRngMode]), [
+        ['/api/aso', toneChoice, expected], ['/api/fix-spam', toneChoice, expected]
+      ]);
+      for (const { body } of requests) assert.equal(Object.hasOwn(body, 'unityRngCertified'), false);
+    });
+  }
+}
+for (const toneChoice of ['normal', 'normal_plus', 'semi', 'aggressive', 'aso_pro', 'aso_pro_alt',
+  'tiktok_aso_pro', 'tiktok_aso_max', 'tiktok_aso_max_rich_html', 'aso_rich_html']) {
+  test(`${toneChoice} hides and isolates a saved RNG certification choice`, async () => {
     const requests = [];
     const $ = await mount(async (url, options) => {
-      requests.push([url, JSON.parse(options.body).tone, JSON.parse(options.body).unityRngCertified]);
+      requests.push({ url, body: JSON.parse(options.body) });
       return new Response(JSON.stringify({ shortDescription: 'Demo: Explore.', fullDescription: 'Explore virtual games.',
         spamCheck: { clean: true, remaining: [], frequency: [], maxAllowed: 1, totalWords: 3, densityLimit: 2.5 } }));
     }, { toneChoice });
+    $('unityRngCertified').checked = true;
     $('toneChoice').onclick();
-    assert.equal($('unityOptions').hidden, !certifiedWhenChecked);
-    for (const [checked, expected] of [[false, false], [true, certifiedWhenChecked], ['true', false]]) {
-      $('unityRngCertified').checked = checked;
-      await $('genBtn').onclick();
-      await $('fixSpamBtn').onclick();
-      assert.deepEqual(requests.splice(0), [
-        ['/api/aso', toneChoice, expected], ['/api/fix-spam', toneChoice, expected]
-      ]);
+    assert.equal($('unityOptions').hidden, true);
+    await $('genBtn').onclick();
+    await $('fixSpamBtn').onclick();
+    assert.deepEqual(requests.map(({ url, body }) => [url, body.tone]), [
+      ['/api/aso', toneChoice], ['/api/fix-spam', toneChoice]
+    ]);
+    for (const { body } of requests) {
+      assert.equal(body.unityRngMode, undefined);
+      assert.equal(Object.hasOwn(body, 'unityRngCertified'), false);
     }
   });
 }
+test('Unity RNG selection survives switching among Unity styles and away to another style', async () => {
+  const requests = [];
+  const $ = await mount(async (url, options) => {
+    requests.push({ url, body: JSON.parse(options.body) });
+    return new Response(JSON.stringify({ shortDescription: 'Demo: Explore.', fullDescription: 'Explore virtual games.',
+      spamCheck: { clean: true, remaining: [], frequency: [], maxAllowed: 1, totalWords: 3, densityLimit: 2.5 } }));
+  }, { toneChoices: ['tiktok_aso_unity', 'tiktok_aso_unity_rich_html', 'aso_pro_alt_unity', 'normal'] });
+  $('tone_tiktok_aso_unity').onclick();
+  $('unityRngOmit').checked = true;
+  $('tone_tiktok_aso_unity_rich_html').onclick();
+  await $('genBtn').onclick();
+  $('tone_normal').onclick();
+  assert.equal($('unityOptions').hidden, true);
+  await $('fixSpamBtn').onclick();
+  $('tone_aso_pro_alt_unity').onclick();
+  assert.equal($('unityOptions').hidden, false);
+  await $('genBtn').onclick();
+  await $('fixSpamBtn').onclick();
+  assert.equal($('unityRngOmit').checked, true);
+  assert.deepEqual(requests.map(({ url, body }) => [url, body.tone, body.unityRngMode]), [
+    ['/api/aso', 'tiktok_aso_unity_rich_html', 'omit'],
+    ['/api/fix-spam', 'normal', undefined],
+    ['/api/aso', 'aso_pro_alt_unity', 'omit'],
+    ['/api/fix-spam', 'aso_pro_alt_unity', 'omit']
+  ]);
+});
 test('ZIP rich result previews safe formatting and copies both original HTML and visible text', async () => {
   const clipboard = [];
   const html = '<b><font color="red">Explore</font></b>\n<i>At your pace</i> <u>offline</u>';

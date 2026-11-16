@@ -63,6 +63,57 @@ for (const tone of ['tiktok_aso_unity', 'tiktok_aso_unity_rich_html', 'aso_pro_a
   });
 }
 
+// A selected wording mode must reach every provider prompt, including later
+// repairs; otherwise an unchecked legacy flag can silently undo the choice.
+for (const tone of ['tiktok_aso_unity', 'tiktok_aso_unity_rich_html', 'aso_pro_alt_unity']) {
+  for (const mode of ['omit', 'chance', 'certified']) {
+    for (const operation of ['generate', 'automatic repair', 'manual repair']) {
+      test(`${tone} respects ${mode} wording during ${operation}`, async t => {
+        const outputs = operation === 'automatic repair' ? [repeated, clean] : [clean];
+        const { post, prompts } = await fixture(t, outputs);
+        const route = operation === 'manual repair' ? '/api/fix-spam' : '/api/aso';
+        const { status } = await post(route, { ...payload, text: repeated, tone,
+          unityRngMode: mode, unityRngCertified: mode !== 'certified' });
+        assert.equal(status, 200);
+        assert.equal(prompts.length, operation === 'automatic repair' ? 2 : 1);
+        for (const prompt of prompts) {
+          assert.match(prompt, new RegExp(`RNG wording: ${mode.toUpperCase()}`));
+          assert.match(prompt, mode === 'certified'
+            ? /RNG certification: CONFIRMED/ : /RNG certification: NOT CONFIRMED/);
+          assert.match(prompt, /Terms and Conditions/);
+          if (mode === 'omit') {
+            assert.match(prompt, /Omit the "Random Outcomes" section/);
+            assert.match(prompt, /do not add or retain a separate randomness\/RNG explanation/);
+            assert.doesNotMatch(prompt, /"Random Outcomes:" — explain chance|rewards and chance naturally/);
+          } else {
+            assert.match(prompt, /For the TikTok Unity layout, use the "Random Outcomes:" section; for Alternative Unity, integrate the explanation into its thematic prose/);
+          }
+        }
+      });
+    }
+  }
+}
+
+for (const mode of ['unknown', '', true, null, {}, ['certified']]) {
+  test(`invalid explicit RNG mode cannot inherit legacy certification (${JSON.stringify(mode)})`, async t => {
+    const { post, prompts } = await fixture(t);
+    const { status } = await post('/api/aso', { ...payload, unityRngMode: mode, unityRngCertified: true });
+    assert.equal(status, 200);
+    assert.match(prompts[0], /RNG wording: CHANCE/);
+    assert.match(prompts[0], /RNG certification: NOT CONFIRMED/);
+  });
+}
+
+test('non-Unity generation and repair ignore an explicit RNG wording mode', async t => {
+  const { post, prompts } = await fixture(t);
+  for (const route of ['/api/aso', '/api/fix-spam']) {
+    const { status } = await post(route, { ...payload, text: repeated, tone: 'normal', unityRngMode: 'certified' });
+    assert.equal(status, 200);
+  }
+  assert.equal(prompts.length, 2);
+  assert.ok(prompts.every(prompt => !/RNG wording:|RNG certification:|UNITY DISCLOSURES/.test(prompt)));
+});
+
 const alternativeTone = 'aso_pro_alt_unity';
 test('Alternative Unity generation combines its narrative presentation with Unity disclosures', async t => {
   const { post, prompts } = await fixture(t, [`<b>${clean}</b>`]);

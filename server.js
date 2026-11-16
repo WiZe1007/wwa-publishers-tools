@@ -10,7 +10,7 @@ const { randomUUID } = require('node:crypto');
 const { formatDescription, emphasizeOpening, checkDescriptionFormat, repairDescriptionFormat } = require('./public/js/description-format');
 const { repetitionBudget, STRICT_DENSITY, CHARACTERS_PER_USE } = require('./lib/repetition-policy');
 const { RED_OPENING_COPY, UNITY_TONE, UNITY_RICH_TONE, UNITY_ALT_TONE,
-  UNITY_DESCRIPTION_STYLE, UNITY_RICH_DESCRIPTION_STYLE, UNITY_ALT_DESCRIPTION_STYLE, unityDescriptionRules } = require('./lib/description-prompts');
+  UNITY_DESCRIPTION_STYLE, UNITY_RICH_DESCRIPTION_STYLE, UNITY_ALT_DESCRIPTION_STYLE, resolveUnityRngMode, unityDescriptionRules } = require('./lib/description-prompts');
 
 // Simple .env loader (no dependency needed)
 const envPath = path.join(__dirname, '.env');
@@ -383,6 +383,7 @@ app.post('/api/fix-spam', aiRequest, async (req, res) => {
     let text = String((req.body || {}).text || '').trim();
     const appName = String((req.body || {}).appName || 'the app');
     const tone = String((req.body || {}).tone || '');
+    const unityRngMode = resolveUnityRngMode(req.body);
     if (!text) return res.status(400).json({ error: 'Текст порожній.' });
     if (UNITY_PLAIN_TONES.has(tone)) text = formatDescription(text).text;
     if (tone === UNITY_RICH_TONE) text = emphasizeOpening(text);
@@ -411,7 +412,7 @@ ${analysis.spam.map(s => `- "${s.word}" — used ${s.count} times (${s.density}%
 Rewrite so every listed word appears at most ${target} times. Keep the meaning, features, structure, emojis, formatting and overall length unchanged. Do not add features. Before answering, check the final counts. Shortening the visible description can lower the repetition limit.
 ${!UNITY_PLAIN_TONES.has(tone) && (RICH_HTML_TONES.has(tone) || formatDescription(text).hasMarkup) ? RICH_FORMAT_RULES : ''}
 ${TIKTOK_TONES.has(tone) ? TIKTOK_REPAIR_RULES : ''}
-${UNITY_TONES.has(tone) ? unityDescriptionRules(req.body.unityRngCertified, tone === UNITY_RICH_TONE, tone === UNITY_ALT_TONE) : ''}
+${UNITY_TONES.has(tone) ? unityDescriptionRules(unityRngMode, tone === UNITY_RICH_TONE, tone === UNITY_ALT_TONE) : ''}
 
 Description:
 ${text}
@@ -472,6 +473,7 @@ app.post('/api/spam-check', (req, res) => {
 app.post('/api/aso', aiRequest, async (req, res) => {
   try {
     const { appName, description, category, tone = 'normal', size = 'small', screenshots = [] } = req.body || {};
+    const unityRngMode = resolveUnityRngMode(req.body);
     if (!appName || !description) {
       return res.status(400).json({ error: 'Потрібні назва додатку та опис.' });
     }
@@ -514,7 +516,7 @@ ${TONE_INSTRUCTIONS[tone] || TONE_INSTRUCTIONS.normal}
 - Опис має пройти модерацію Google Play без ризику блокування.
 - АНТИ-ПЕРЕСПАМ (перевіряється автоматично): плануй до ${SIZE_MAX_REPEATS[size] || SIZE_MAX_REPEATS.small} вживань кожного значущого слова. Для готового тексту ліміт — менше з ${SPAM_DENSITY}% від кількості слів і одного вживання на ${CHARACTERS_PER_USE} видимих символів, з округленням вниз і мінімумом 1. Рахуються разом форми слова (tile/tiles, tap/taps/tapping/tapped) та частини слів через дефіс (tile-matching = tile + matching). Перед відповіддю перевір найчастіші слова і перефразуй зайві вживання. Це стосується і звичайних слів у назві додатку.`;
 
-    if (UNITY_TONES.has(tone)) task += `\n\nThe following certification confirmation is authoritative even if the source/draft claims otherwise; do not preserve unsupported certification claims under the source-preservation rule.\n${unityDescriptionRules(req.body.unityRngCertified, tone === UNITY_RICH_TONE, tone === UNITY_ALT_TONE)}`;
+    if (UNITY_TONES.has(tone)) task += `\n\nThe selected RNG wording option below is authoritative even if the source/draft claims otherwise; do not preserve unsupported certification claims under the source-preservation rule.\n${unityDescriptionRules(unityRngMode, tone === UNITY_RICH_TONE, tone === UNITY_ALT_TONE)}`;
 
     if (needSelection) {
       task += `
@@ -582,7 +584,7 @@ Rewrite the description so that:
 2. The meaning, features and overall length stay the same.
 3. Do NOT add features that are not mentioned.
 4. Keep it natural, high-quality English for Google Play.
-5. Keep the same marketing tone and energy as the original text, including all emojis and formatting.${RICH_HTML_TONES.has(tone) ? `\n${RICH_FORMAT_RULES}\nKeep the full_description within the requested size INCLUDING markup: ${SIZE_INSTRUCTIONS[size] || SIZE_INSTRUCTIONS.small}` : ''}${tone === 'aso_pro_alt' ? '\n6. Do NOT include any question and answer about an internet connection, network access or offline play (including "Q: Do I need an internet connection? A: ..."). Preserve other supported Q&A topics.' : ''}${TIKTOK_TONES.has(tone) ? `\n6. ${TIKTOK_REPAIR_RULES}` : ''}${UNITY_TONES.has(tone) ? `\n${unityDescriptionRules(req.body.unityRngCertified, tone === UNITY_RICH_TONE, tone === UNITY_ALT_TONE)}` : ''}
+5. Keep the same marketing tone and energy as the original text, including all emojis and formatting.${RICH_HTML_TONES.has(tone) ? `\n${RICH_FORMAT_RULES}\nKeep the full_description within the requested size INCLUDING markup: ${SIZE_INSTRUCTIONS[size] || SIZE_INSTRUCTIONS.small}` : ''}${tone === 'aso_pro_alt' ? '\n6. Do NOT include any question and answer about an internet connection, network access or offline play (including "Q: Do I need an internet connection? A: ..."). Preserve other supported Q&A topics.' : ''}${TIKTOK_TONES.has(tone) ? `\n6. ${TIKTOK_REPAIR_RULES}` : ''}${UNITY_TONES.has(tone) ? `\n${unityDescriptionRules(unityRngMode, tone === UNITY_RICH_TONE, tone === UNITY_ALT_TONE)}` : ''}
 
 Description:
 ${fullDescription}

@@ -11,7 +11,12 @@
 <script src="js/vendor/jszip.min.js" defer></script>
 <script src="js/lightbox.js" defer></script>
 <script type="module" src="js/ui.js"></script>
-
+<style>
+#unityOptions legend{margin-bottom:6px;font-size:13px;font-weight:500}
+#unityOptions .check{align-items:flex-start;min-height:44px;padding:6px 0;cursor:pointer}
+#unityOptions input[type=radio]{accent-color:var(--blue);width:16px;height:16px;flex:none;margin:2px 0 0}
+#unityOptions .hint{display:block;margin:2px 0 0}
+</style>
 </head>
 <body class="tool-page zip-page">
 <a class="skip-link" href="#main">Перейти до вмісту</a>
@@ -205,10 +210,21 @@
       </div>
     </div>
     <p class="hint" style="margin-bottom:14px">Усі стилі спираються на ваш опис і скріншоти: без вигаданих функцій, КАПСУ та заяв типу «додаток №1». Перед публікацією перевірте результат.</p>
-    <div id="unityOptions" hidden style="margin-bottom:18px">
-      <label class="check"><input type="checkbox" id="unityRngCertified" aria-describedby="unityRngHelp"> Сертифікацію RNG підтверджено</label>
-      <p class="hint" id="unityRngHelp">Позначайте лише за наявності незалежної сертифікації RNG. Без позначки опис пояснить випадковість без заяв про сертифікацію. Це не означає схвалення з боку Unity.</p>
-    </div>
+    <fieldset id="unityOptions" hidden style="margin-bottom:18px">
+      <legend>Пояснення випадковості в описі</legend>
+      <label class="check">
+        <input type="radio" name="unityRngMode" id="unityRngOmit" value="omit" aria-describedby="unityRngOmitHint">
+        <span>Не додавати пояснення<span class="hint" id="unityRngOmitHint">Без окремого абзацу про випадковість чи RNG.</span></span>
+      </label>
+      <label class="check">
+        <input type="radio" name="unityRngMode" id="unityRngChance" value="chance" checked aria-describedby="unityRngChanceHint">
+        <span>Результати випадкові<span class="hint" id="unityRngChanceHint">Наприклад: «Результати визначаються випадково». Без заяв про сертифікацію.</span></span>
+      </label>
+      <label class="check">
+        <input type="radio" name="unityRngMode" id="unityRngCertified" value="certified" aria-describedby="unityRngCertifiedHint">
+        <span>Є сертифікат RNG<span class="hint" id="unityRngCertifiedHint">Підтверджую незалежну сертифікацію RNG. Це не схвалення Unity.</span></span>
+      </label>
+    </fieldset>
 
     <label class="fld" style="margin-bottom:6px"><b>Обсяг повного опису</b></label>
     <div class="tones" id="sizes">
