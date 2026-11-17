@@ -1,7 +1,9 @@
 import { createMetadataDate, isImage, isVideo, stripImageMetadata, stripVideoMetadata } from '../metadata.js';
 import { requestJson, ensureAIReady } from '../http.js';
 import '../description-format.js';
+import '../ai-screenshots.js';
 const { formatDescription, checkDescriptionFormat, repairDescriptionFormat } = globalThis.WWADescriptionFormat;
+const { prepareAIScreenshots } = globalThis.WWAAIScreenshots;
 
 // Each tool owns its DOM and state, including while detached during navigation.
 export function mount(root) {
@@ -220,16 +222,16 @@ $('genBtn').onclick = async () => {
   st.className = 'status';
   if (!name || !desc) { st.className = 'status err'; st.textContent = 'Заповніть назву додатку та опис від розробника.'; return; }
   if (state.screenshots.length === 0) { st.className = 'status err'; st.textContent = 'Додайте хоча б один скріншот.'; return; }
+  const screenshotSnapshot = state.screenshots.slice();
 
   $('genBtn').disabled = true;
   st.innerHTML = '<span class="spinner"></span>Підключаю сервер. Безплатний Render може прокидатися до хвилини…';
   try {
     await ensureAIReady();
-    st.innerHTML = '<span class="spinner"></span>Стискаю скріншоти та відправляю в Claude...';
-    const thumbs = [];
-    for (const s of state.screenshots) thumbs.push(await compressImage(s.file, 800, 0.72));
+    st.innerHTML = '<span class="spinner"></span>Готую чіткі скріншоти для AI…';
+    const thumbs = await prepareAIScreenshots(screenshotSnapshot.map(s => s.file));
 
-    st.innerHTML = '<span class="spinner"></span>Claude генерує описи' + (state.screenshots.length > 8 ? ', обирає 8 найкращих скріншотів' : '') + ' та перевіряє на переспам...';
+    st.innerHTML = '<span class="spinner"></span>Claude генерує описи' + (screenshotSnapshot.length > 8 ? ', обирає 8 найкращих скріншотів' : '') + ' та перевіряє на переспам...';
     const data = await requestJson('/api/aso', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -252,7 +254,12 @@ $('genBtn').onclick = async () => {
     $('asoResults').style.display = '';
     updCount();
     updFullCount();
-    if (data.selected) { state.selectedIdx = data.selected; renderShots(); }
+    const screenshotsUnchanged = state.screenshots.length === screenshotSnapshot.length &&
+      screenshotSnapshot.every((shot, index) => state.screenshots[index] === shot);
+    if (data.selected || !screenshotsUnchanged) {
+      state.selectedIdx = screenshotsUnchanged ? data.selected : null;
+      renderShots();
+    }
     const hasSpam = data.spamCheck?.clean === false;
     st.className = hasSpam ? 'status err' : data.warning ? 'status' : 'status ok';
     st.textContent = hasSpam ? 'Опис отримано. Зменште повтори, позначені нижче.'
@@ -349,25 +356,6 @@ $('spamBtn').onclick = async () => {
     st.textContent = 'Помилка: ' + e.message;
   }
 };
-
-// Compress image → {mediaType, data(base64)}
-function compressImage(file, maxDim, quality) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      const k = Math.min(1, maxDim / Math.max(img.width, img.height));
-      const c = document.createElement('canvas');
-      c.width = Math.max(1, Math.round(img.width * k));
-      c.height = Math.max(1, Math.round(img.height * k));
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-      const dataUrl = c.toDataURL('image/jpeg', quality);
-      URL.revokeObjectURL(img.src);
-      resolve({ mediaType: 'image/jpeg', data: dataUrl.split(',')[1] });
-    };
-    img.onerror = () => reject(new Error('Не вдалося прочитати ' + file.name));
-    img.src = URL.createObjectURL(file);
-  });
-}
 
 // ================= How to Publish.txt template =================
 function buildHowToPublish() {

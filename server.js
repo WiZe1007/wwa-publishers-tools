@@ -6,6 +6,7 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const { createAiRequest, aiFailure } = require('./lib/ai-request');
+const { validateAIScreenshots, LIMITS: AI_SCREENSHOT_LIMITS } = require('./public/js/ai-screenshots');
 const { randomUUID } = require('node:crypto');
 const { formatDescription, emphasizeOpening, checkDescriptionFormat, repairDescriptionFormat } = require('./public/js/description-format');
 const { repetitionBudget, STRICT_DENSITY, CHARACTERS_PER_USE } = require('./lib/repetition-policy');
@@ -480,19 +481,30 @@ app.post('/api/aso', aiRequest, async (req, res) => {
     if (!appName || !description) {
       return res.status(400).json({ error: 'Потрібні назва додатку та опис.' });
     }
-    if (!Array.isArray(screenshots) || screenshots.length > 40 || screenshots.some(s => !s || typeof s.data !== 'string' ||
-        !s.data || (s.mediaType && !['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(s.mediaType))))
-      return res.status(400).json({ code: 'validation', error: 'Додайте коректні скріншоти (до 40 файлів).' });
+    try {
+      if (Buffer.byteLength(JSON.stringify(req.body || {}), 'utf8') > AI_SCREENSHOT_LIMITS.requestBytes)
+        throw new Error('Забагато даних для одного AI-запиту. Зменште кількість скріншотів.');
+      validateAIScreenshots(screenshots);
+    } catch (error) {
+      return res.status(400).json({ code: 'validation', error: error.message });
+    }
     if (!req.app.locals.isAIConfigured()) return sendAiFailure(res, { code: 'configuration' }, req.ai);
 
     const needSelection = screenshots.length > 8;
 
     const content = [];
     screenshots.forEach((s, i) => {
-      content.push({ type: 'text', text: `Screenshot #${i + 1}:` });
+      content.push({ type: 'text', text: `Screenshot #${i + 1}: full view (original screenshot).` });
       content.push({
         type: 'image',
         source: { type: 'base64', media_type: s.mediaType || 'image/jpeg', data: s.data }
+      });
+      (s.details || []).forEach((detail, index) => {
+        content.push({ type: 'text', text: `Screenshot #${i + 1} detail #${index + 1}: magnified crop of the same original screenshot; not a separate screenshot.` });
+        content.push({
+          type: 'image',
+          source: { type: 'base64', media_type: detail.mediaType || 'image/jpeg', data: detail.data }
+        });
       });
     });
 
@@ -500,6 +512,8 @@ app.post('/api/aso', aiRequest, async (req, res) => {
 
 Опис: ${description}
 ${category ? `\nКатегорія: ${category}` : ''}
+
+Image-reading instructions: use the full views for overall context and clear detail crops to read small labels accurately. Detail crops follow row by row, left to right, and belong to their numbered original screenshot. Detail crops are not separate screenshot candidates. If text is unreadable, omit it rather than inventing labels, values or features.
 
 Вимоги до результату:
 1. "short_description" — короткий опис для Google Play, англійською, СТРОГО не більше 80 символів включно (порахуй символи!). Формат обов'язковий: назва додатку, потім двокрапка або знак оклику, потім основна частина, а В КІНЦІ — знак оклику або крапка. Приклад: "${appName}: main catchy part here!" або "${appName}! main catchy part here."
@@ -524,6 +538,7 @@ ${TONE_INSTRUCTIONS[tone] || TONE_INSTRUCTIONS.normal}
     if (needSelection) {
       task += `
 3. Скріншотів більше 8. Обери 8 НАЙКРАЩИХ для сторінки Google Play (найінформативніші, найякісніші, різноманітні сцени) та поверни їх номери у полі "selected" у порядку, в якому їх варто показувати (номери скріншотів як вони пронумеровані вище, починаючи з 1).`;
+      task += '\nReturn original screenshot numbers only in "selected". Select eight distinct originals; ignore detail crop count when selecting or numbering screenshots.';
     }
 
     task += `
@@ -546,7 +561,8 @@ ${TONE_INSTRUCTIONS[tone] || TONE_INSTRUCTIONS.normal}
     let selected = null;
     if (needSelection) {
       selected = Array.isArray(parsed.selected)
-        ? parsed.selected.map(n => Number(n) - 1).filter(i => i >= 0 && i < screenshots.length).slice(0, 8)
+        ? [...new Set(parsed.selected.filter(Number.isInteger).map(n => n - 1)
+          .filter(i => i >= 0 && i < screenshots.length))].slice(0, 8)
         : null;
       if (!selected || selected.length === 0) selected = screenshots.slice(0, 8).map((_, i) => i);
       // Top up to 8 if the model returned fewer

@@ -188,6 +188,95 @@ test('invalid screenshots are rejected before invoking AI', async t => {
   assert.equal(status, 400);
 });
 
+test('ASO forwards full views and their ordered details in one call without selecting crops', async t => {
+  const screenshots = Array.from({ length: 8 }, (_, index) => ({
+    mediaType: 'image/png', data: `full-${index + 1}`, width: 1080, height: 1920,
+    ...(index === 0 ? { details: [
+      { mediaType: 'image/png', data: 'top-left', width: 1080, height: 960 },
+      { mediaType: 'image/png', data: 'bottom-right', width: 1080, height: 960 }
+    ] } : {})
+  }));
+  let calls = 0, sent;
+  const post = await fixture(t, async content => { calls++; sent = content; return JSON.stringify(draft); });
+  const { status, data } = await post('/api/aso', { ...body, screenshots });
+  assert.equal(status, 200);
+  assert.equal(calls, 1);
+  assert.equal(data.selected, null);
+  assert.deepEqual(sent.filter(block => block.type === 'image').map(block => block.source.data), [
+    'full-1', 'top-left', 'bottom-right', 'full-2', 'full-3', 'full-4', 'full-5', 'full-6', 'full-7', 'full-8'
+  ]);
+  assert.match(sent[0].text, /Screenshot #1.*full view/i);
+  assert.match(sent[2].text, /Screenshot #1.*detail #1/i);
+  assert.match(sent[4].text, /Screenshot #1.*detail #2/i);
+  assert.match(sent[2].text, /same original|same screenshot/i);
+  assert.match(sent.at(-1).text, /row.by.row.*left.to.right/i);
+  assert.match(sent.at(-1).text, /unreadable/i);
+});
+
+test('ASO selection contains eight unique integer original indices despite duplicate crop-like numbers', async t => {
+  let sent;
+  const screenshots = Array.from({ length: 9 }, (_, index) => ({ data: `full-${index + 1}`,
+    details: [{ data: `detail-${index + 1}` }] }));
+  const post = await fixture(t, async content => {
+    sent = content;
+    return JSON.stringify({ ...draft, selected: [9, 9, 1.5, 10, '3', 2, null, 1] });
+  });
+  const { status, data } = await post('/api/aso', { ...body, screenshots });
+  assert.equal(status, 200);
+  assert.deepEqual(data.selected, [8, 1, 0, 2, 3, 4, 5, 6]);
+  assert.equal(sent.filter(block => block.type === 'image').length, 18);
+  assert.match(sent.at(-1).text, /original screenshot numbers only/i);
+  assert.match(sent.at(-1).text, /crops.*not.*separate|details.*not.*separate/i);
+});
+
+for (const [name, screenshot] of [
+  ['non-array details', { data: 'full', details: {} }],
+  ['empty detail data', { data: 'full', details: [{ data: '' }] }],
+  ['unsupported detail MIME', { data: 'full', details: [{ data: 'detail', mediaType: 'image/svg+xml' }] }],
+  ['invalid detail dimensions', { data: 'full', details: [{ data: 'detail', width: 0, height: 100 }] }],
+  ['too many details', { data: 'full', details: Array.from({ length: 5 }, () => ({ data: 'detail' })) }]
+]) {
+  test(`ASO rejects ${name} before invoking AI`, async t => {
+    let calls = 0;
+    const post = await fixture(t, async () => { calls++; return JSON.stringify(draft); });
+    const { status, data } = await post('/api/aso', { ...body, screenshots: [screenshot] });
+    assert.equal(status, 400);
+    assert.equal(data.code, 'validation');
+    assert.equal(calls, 0);
+  });
+}
+
+test('ASO rejects an oversized detail before invoking AI', async t => {
+  let calls = 0;
+  const post = await fixture(t, async () => { calls++; return JSON.stringify(draft); });
+  const { status, data } = await post('/api/aso', { ...body,
+    screenshots: [{ data: 'full', details: [{ data: 'a'.repeat(8 * 1024 * 1024 + 1) }] }] });
+  assert.equal(status, 400);
+  assert.equal(data.code, 'validation');
+  assert.equal(calls, 0);
+});
+
+test('ASO rejects too many original and detail images together before invoking AI', async t => {
+  let calls = 0;
+  const post = await fixture(t, async () => { calls++; return JSON.stringify(draft); });
+  const screenshots = Array.from({ length: 21 }, () => ({ data: 'full',
+    details: Array.from({ length: 4 }, () => ({ data: 'detail' })) }));
+  const { status, data } = await post('/api/aso', { ...body, screenshots });
+  assert.equal(status, 400);
+  assert.equal(data.code, 'validation');
+  assert.equal(calls, 0);
+});
+
+test('ASO rejects a JSON request over its byte budget before invoking AI', async t => {
+  let calls = 0;
+  const post = await fixture(t, async () => { calls++; return JSON.stringify(draft); });
+  // UTF-8 byte size exceeds 64 MiB while character count stays well below it.
+  const { status, data } = await post('/api/aso', { ...body, padding: 'é'.repeat(32 * 1024 * 1024) });
+  assert.equal(status, 400);
+  assert.equal(data.code, 'validation');
+  assert.equal(calls, 0);
+});
+
 test('real deadline returns JSON even when a provider ignores cancellation', async t => {
   const demo = express(); demo.use(express.json());
   let calls = 0, observedSignal;
